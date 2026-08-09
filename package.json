@@ -1,33 +1,24 @@
 {
   "name": "cursor-tab",
-  "type": "module",
   "displayName": "cursor-tab",
-  "description": "cursor-tab-completion",
   "version": "0.0.1",
-  "engines": {
-    "vscode": "^1.125.0"
-  },
+  "private": true,
+  "description": "cursor-tab-completion",
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "type": "module",
   "main": "./out/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "cursor-tab.helloWorld",
-        "title": "Hello World"
-      }
-    ]
-  },
   "scripts": {
+    "compile": "tsc -p ./",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
-    "vscode:prepublish": "pnpm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "prepare": "husky",
     "pretest": "pnpm run compile && pnpm run lint",
-    "prepare": "husky"
+    "vscode:prepublish": "pnpm run compile",
+    "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
     "@types/node": "24.x",
@@ -46,6 +37,20 @@
     "serialize-javascript": "^7.0.6"
   },
   "lint-staged": {
+    "*": "oxfmt --no-error-on-unmatched-pattern",
     "*.{js,jsx,ts,tsx,mjs,cjs}": "bun run lint"
-  }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "cursor-tab.helloWorld",
+        "title": "Hello World"
+      }
+    ]
+  },
+  "activationEvents": [],
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "packageManager": "bun@1.3.14"
 }

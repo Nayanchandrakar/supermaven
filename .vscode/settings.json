@@ -1,15 +1,17 @@
-// Place your settings in this file to overwrite default and user settings.
 {
-	"files.exclude": {
-		"out": false // set this to true to hide the "out" folder with the compiled JS files
-	},
-	"search.exclude": {
-		"out": true // set this to false to include "out" folder in search results
-	},
-	// Turn off tsc task auto detection since we have the necessary tasks as npm scripts
-	"js/ts.tsc.autoDetect": "off",
-	// custom settings here
-	"editor.codeActionsOnSave": {
-		"source.fixAll.oxc": "always"
-	}
+  "js/ts.tsc.autoDetect": "off",
+  "files.exclude": {
+    "dist": false
+  },
+  "oxc.fmt.configPath": "./oxfmt.config.ts",
+  "json.format.enable": false,
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "editor.formatOnSave": true,
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
+  "search.exclude": {
+    "dist": true,
+    "**/node_modules": true,
+    "**/*.code-search": true
+  }
 }
