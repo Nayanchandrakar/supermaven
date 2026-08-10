@@ -1,7 +1,8 @@
 {
   "name": "cursor-tab",
+  "type": "module",
   "displayName": "cursor-tab",
-  "description": "ai-tab-autocompletion",
+  "description": "cursor-tab-completion",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.125.0"
@@ -20,25 +21,31 @@
     ]
   },
   "scripts": {
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
     "vscode:prepublish": "pnpm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "pnpm run compile && pnpm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "prepare": "husky"
   },
   "devDependencies": {
-    "@types/vscode": "^1.125.0",
-    "@types/mocha": "^10.0.10",
     "@types/node": "24.x",
-    "typescript-eslint": "^8.61.1",
+    "@types/vscode": "^1.125.0",
     "eslint": "^10.5.0",
-    "typescript": "^6.0.3",
-    "@vscode/test-cli": "^0.0.15",
-    "@vscode/test-electron": "^3.0.0"
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
+    "oxfmt": "^0.63.0",
+    "oxlint": "^1.78.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "tsdown": "^0.22.14",
+    "typescript": "^6.0.3"
   },
   "overrides": {
     "diff": "^8.0.4",
     "serialize-javascript": "^7.0.6"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs}": "bun run lint"
   }
 }
