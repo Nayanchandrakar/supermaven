@@ -8,33 +8,26 @@
     "Other"
   ],
   "type": "module",
-  "main": "./out/extension.js",
+  "main": "./dist/extension.mjs",
   "scripts": {
-    "compile": "tsc -p ./",
+    "build": "tsdown",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "prepare": "husky",
-    "pretest": "pnpm run compile && pnpm run lint",
-    "vscode:prepublish": "pnpm run compile",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsdown --watch"
   },
   "devDependencies": {
-    "@types/node": "24.x",
+    "@types/node": "^26.2.0",
     "@types/vscode": "^1.125.0",
-    "eslint": "^10.5.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
     "oxfmt": "^0.63.0",
     "oxlint": "^1.78.0",
     "oxlint-tsgolint": "^7.0.2001",
     "tsdown": "^0.22.14",
-    "typescript": "^6.0.3"
-  },
-  "overrides": {
-    "diff": "^8.0.4",
-    "serialize-javascript": "^7.0.6"
+    "typescript": "^7.0.2"
   },
   "lint-staged": {
     "*": "oxfmt --no-error-on-unmatched-pattern",

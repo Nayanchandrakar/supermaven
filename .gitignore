@@ -6,6 +6,10 @@ jspm_packages/
 bower_components
 web_modules/
 
+# agent skills
+.agents/
+skills-lock.json
+
 # yarn
 .yarn/*
 !.yarn/patches
@@ -37,7 +41,7 @@ dist
 build/Release/
 out
 
-# env
+# environment variables
 .env
 .env.*
 .env*
