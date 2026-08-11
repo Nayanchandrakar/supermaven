@@ -11,14 +11,16 @@
   "main": "./dist/extension.mjs",
   "scripts": {
     "build": "tsdown",
+    "dev": "tsdown --watch",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
-    "prepare": "husky",
-    "watch": "tsdown --watch"
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
     "@types/node": "^26.2.0",
     "@types/vscode": "^1.125.0",
     "husky": "^9.1.7",
