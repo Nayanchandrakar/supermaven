@@ -40,10 +40,16 @@
       {
         "command": "cursor-tab.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "cursor-tab.showInlineCompletionDemo",
+        "title": "Inline Completion Demo: Show Instructions"
       }
     ]
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "engines": {
     "vscode": "^1.125.0"
   },
