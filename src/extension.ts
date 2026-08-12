@@ -10,7 +10,7 @@ export function activate(context: vscode.ExtensionContext) {
     "cursor-tab.showInlineCompletionDemo",
     () => {
       vscode.window.showInformationMessage(
-        "Type '// inline-demo', 'const greeting =' or 'function demo' at the end of a line to see an inline completion."
+        "Try tab:hello, tab:choose, console., tab:fn, tab:forof, tab:try, tab:def, tab:main, tab:json or tab:todo."
       );
     }
   );
