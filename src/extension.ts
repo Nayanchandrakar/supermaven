@@ -10,8 +10,15 @@ export function activate(context: vscode.ExtensionContext) {
     "cursor-tab.showInlineCompletionDemo",
     () => {
       vscode.window.showInformationMessage(
-        "Try tab:hello, tab:choose, console., tab:fn, tab:forof, tab:try, tab:def, tab:main, tab:json or tab:todo."
+        "Try tab:hello, tab:choose, demoWord, tab:filter, tab:context, tab:slow or tab:accepted. See INLINE_COMPLETION_GUIDE.md for all examples."
       );
+    }
+  );
+
+  const inlineCompletionAccepted = vscode.commands.registerCommand(
+    "cursor-tab.inlineCompletionAccepted",
+    (trigger: unknown) => {
+      vscode.window.setStatusBarMessage(`Accepted the completion for ${String(trigger)}.`, 2000);
     }
   );
 
@@ -20,7 +27,12 @@ export function activate(context: vscode.ExtensionContext) {
     new DemoInlineCompletionProvider()
   );
 
-  context.subscriptions.push(disposable, showInlineCompletionDemo, inlineCompletionProvider);
+  context.subscriptions.push(
+    disposable,
+    showInlineCompletionDemo,
+    inlineCompletionAccepted,
+    inlineCompletionProvider
+  );
 }
 
 export function deactivate() {}
