@@ -1,11 +1,15 @@
 import * as vscode from "vscode";
-import { InlineCompletionProvider } from "@/inline-completion-provider";
+import { InlineCompletionItemProvider } from "@/lib/inline-completion-item-provider";
 
 export function activate(context: vscode.ExtensionContext) {
-  const inlineCompletionProvider = new InlineCompletionProvider();
+  const outputChannel = vscode.window.createOutputChannel("Tab completion");
+  outputChannel.appendLine("Extension activated");
+
+  const provider = new InlineCompletionItemProvider(outputChannel);
+
   const disposable = vscode.languages.registerInlineCompletionItemProvider(
     { pattern: "**" },
-    inlineCompletionProvider
+    provider
   );
 
   context.subscriptions.push(disposable);

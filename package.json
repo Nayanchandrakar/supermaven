@@ -36,16 +36,7 @@
     "*.{js,jsx,ts,tsx,mjs,cjs}": "bun run lint"
   },
   "contributes": {
-    "commands": [
-      {
-        "command": "cursor-tab.helloWorld",
-        "title": "Hello World"
-      },
-      {
-        "command": "cursor-tab.showInlineCompletionDemo",
-        "title": "Inline Completion Demo: Show Instructions"
-      }
-    ]
+    "commands": []
   },
   "activationEvents": [
     "onStartupFinished"
