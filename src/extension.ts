@@ -1,26 +1,38 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
+import { DemoInlineCompletionProvider } from "./inline-completion-provider.js";
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
+  const disposable = vscode.commands.registerCommand("cursor-tab.helloWorld", () => {
+    vscode.window.showInformationMessage("Hello World from cursor-tab!");
+  });
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "cursor-tab" is now active!');
+  const showInlineCompletionDemo = vscode.commands.registerCommand(
+    "cursor-tab.showInlineCompletionDemo",
+    () => {
+      vscode.window.showInformationMessage(
+        "Try tab:hello, tab:choose, demoWord, tab:filter, tab:context, tab:slow or tab:accepted. See INLINE_COMPLETION_GUIDE.md for all examples."
+      );
+    }
+  );
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('cursor-tab.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from cursor-tab!');
-	});
+  const inlineCompletionAccepted = vscode.commands.registerCommand(
+    "cursor-tab.inlineCompletionAccepted",
+    (trigger: unknown) => {
+      vscode.window.setStatusBarMessage(`Accepted the completion for ${String(trigger)}.`, 2000);
+    }
+  );
 
-	context.subscriptions.push(disposable);
+  const inlineCompletionProvider = vscode.languages.registerInlineCompletionItemProvider(
+    [{ scheme: "file" }, { scheme: "untitled" }],
+    new DemoInlineCompletionProvider()
+  );
+
+  context.subscriptions.push(
+    disposable,
+    showInlineCompletionDemo,
+    inlineCompletionAccepted,
+    inlineCompletionProvider
+  );
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() {}
