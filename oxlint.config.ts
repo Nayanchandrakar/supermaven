@@ -18,6 +18,7 @@ export default defineConfig({
     "eslint/no-unused-vars": "error",
     "unicorn/empty-brace-spaces": "off",
     "typescript/consistent-return": "off",
+    "no-constant-binary-expression": "off",
     "typescript/no-unsafe-assignment": "warn",
     "typescript/no-floating-promises": "error",
     "typescript/no-unsafe-type-assertion": "off",
