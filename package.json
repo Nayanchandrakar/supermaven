@@ -36,6 +36,23 @@
     "*.{js,jsx,ts,tsx,mjs,cjs}": "bun run lint"
   },
   "contributes": {
+    "configuration": [
+      {
+        "title": "Cursor tab completion",
+        "properties": {
+          "cursor-tab.openrouterApiKey": {
+            "type": "string",
+            "default": "",
+            "description": "Openrouter Api key"
+          },
+          "cursor-tab.model": {
+            "type": "string",
+            "description": "Model to use for tab completion",
+            "default": "poolside/laguna-s-2.1:free"
+          }
+        }
+      }
+    ],
     "commands": []
   },
   "activationEvents": [

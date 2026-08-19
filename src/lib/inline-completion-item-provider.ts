@@ -18,22 +18,24 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
 
     this.logger(`${document.fileName} ${position.line} ${position.character} ${prefix}`);
 
-    let result = ""
+    let result = "";
     try {
-      result = await this.callCompletionApi([
-        {
-          role: "system",
-          content:
-            "You are an AI code assistant. Provide concise and context-aware code completions. Only respond with the most likely next lines of code, no explanations."
-        },
-        {
-          role: "user",
-          content: prefix
-        }
-      ], token)
-
+      result = await this.callCompletionApi(
+        [
+          {
+            role: "system",
+            content:
+              "You are an AI code assistant. Provide concise and context-aware code completions. Only respond with the most likely next lines of code, no explanations."
+          },
+          {
+            role: "user",
+            content: prefix
+          }
+        ],
+        token
+      );
     } catch (error) {
-      this.logger(`Api error: ${error}`)
+      this.logger(`Api error: ${error}`);
     }
 
     const newItem = new vscode.InlineCompletionItem(result);
@@ -54,7 +56,7 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       result += chunk;
     }
 
-    return result
+    return result;
   }
 
   private logger(message: string) {
