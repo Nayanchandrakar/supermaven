@@ -26,3 +26,8 @@ export interface ChatStreamChunk {
   created: number;
   choices: Choice[];
 }
+
+export interface ChatMessage {
+  role: Role;
+  content: string;
+}

@@ -1,8 +1,53 @@
 import * as vscode from "vscode";
-import { ChatStreamChunk } from "@/types";
+import { INFERENCE_CONFIG } from "@/constants/inference-config";
+import { getConfigService } from "@/services/config-service";
+import { ChatMessage, ChatStreamChunk, InferenceProvider } from "@/types";
 
 export class ApiClient implements vscode.Disposable {
+  private pendingRequest: AbortController | null = null;
+
   constructor(private readonly outputChannel: vscode.OutputChannel) {}
+
+  cancelRequest() {
+    if (this.pendingRequest) {
+      this.pendingRequest.abort();
+      this.pendingRequest = null;
+    }
+  }
+
+  async complete(messages: ChatMessage[]): Promise<AsyncGenerator<string, void, unknown>> {
+    this.cancelRequest();
+    this.pendingRequest = new AbortController();
+
+    const config = getConfigService();
+    let inferenceProvider: InferenceProvider | null = null;
+
+    if (config.openRouterApiKey) {
+      inferenceProvider = "openrouter";
+    }
+
+    if (!inferenceProvider) {
+      throw new Error(`No api key configured. please provide an valid api key`);
+    }
+
+    const maxTokens = config.maxTokens;
+    const inferenceConfig = INFERENCE_CONFIG[inferenceProvider];
+
+    const apiKey = inferenceConfig.getApiKey();
+    const model = inferenceConfig.getModelName();
+
+    const body: Record<string, unknown> = {
+      model,
+      messages,
+      stream: true,
+      temperature: 0.1,
+      max_tokens: maxTokens
+    };
+
+    this.logger(`[${inferenceProvider}] Request: model=${model}, max_tokens=${maxTokens}`);
+
+    return this.streamRequest(inferenceConfig.url, body, apiKey, this.pendingRequest.signal);
+  }
 
   private async *streamRequest(
     endpoint: string,
@@ -16,7 +61,8 @@ export class ApiClient implements vscode.Disposable {
         Authorization: `Bearer ${apiKey}`,
         "Content-type": "application/json"
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal
     });
 
     if (!response.ok) {
@@ -34,6 +80,7 @@ export class ApiClient implements vscode.Disposable {
 
     try {
       while (1) {
+        // oxlint-disable-next-line no-await-in-loop
         const { done, value } = await reader.read();
 
         if (done) break;
@@ -47,9 +94,7 @@ export class ApiClient implements vscode.Disposable {
           if (line.startsWith("data: ")) {
             const data = line.slice(6);
 
-            if (data === "[DONE]") {
-              return;
-            }
+            if (data === "[DONE]") return;
 
             try {
               const chunk = JSON.parse(data) as ChatStreamChunk;
@@ -61,7 +106,7 @@ export class ApiClient implements vscode.Disposable {
                 }
               }
             } catch (error) {
-              this.logger(`Parse error:${error}`);
+              this.logger(`LLM response parse error:${error}`);
             }
           }
         }
