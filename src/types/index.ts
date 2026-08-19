@@ -1,3 +1,5 @@
+import * as vscode from 'vscode'
+
 export type InferenceProvider = "openrouter";
 export type Role = "system" | "assistant" | "user";
 
@@ -30,4 +32,14 @@ export interface ChatStreamChunk {
 export interface ChatMessage {
   role: Role;
   content: string;
+}
+
+export interface ReplacementEdit {
+  insertText: string;
+  startPosition: vscode.Position
+}
+
+export interface PendingCompletion {
+  documentUri: string;
+  edit: ReplacementEdit
 }

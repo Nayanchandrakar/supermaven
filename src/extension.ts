@@ -4,7 +4,7 @@ import { ApiClient } from "@/lib/api-client";
 import { InlineCompletionItemProvider } from "@/lib/inline-completion-item-provider";
 
 export function activate(context: vscode.ExtensionContext) {
-  const outputChannel = vscode.window.createOutputChannel("Tab completion");
+  const outputChannel = vscode.window.createOutputChannel("Tab completion")
   outputChannel.appendLine("Extension activated");
 
   const apiClient = new ApiClient(outputChannel);
@@ -15,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
     provider
   );
 
-  context.subscriptions.push(disposable);
+  context.subscriptions.push(disposable, outputChannel);
 }
 
 export function deactivate() { }
