@@ -1,7 +1,8 @@
-import * as vscode from 'vscode'
+import * as vscode from "vscode";
 
 export type InferenceProvider = "openrouter";
 export type Role = "system" | "assistant" | "user";
+export type IntentType = "added" | "pasted" | "edited" | "accepted" | "rejected";
 
 export interface InferenceProviderConfig {
   url: string;
@@ -36,10 +37,16 @@ export interface ChatMessage {
 
 export interface ReplacementEdit {
   insertText: string;
-  startPosition: vscode.Position
+  startPosition: vscode.Position;
 }
 
 export interface PendingCompletion {
   documentUri: string;
-  edit: ReplacementEdit
+  edit: ReplacementEdit;
+}
+
+export interface PendingIntent {
+  type: IntentType;
+  filePath: string;
+  originalContent: Map<number, string>;
 }
