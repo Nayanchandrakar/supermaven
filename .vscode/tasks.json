@@ -18,10 +18,16 @@
       "isBackground": true,
       "problemMatcher": {
         "owner": "tsdown",
+        "pattern": {
+          "regexp": "^$",
+          "file": 1,
+          "location": 2,
+          "message": 3
+        },
         "background": {
           "activeOnStart": true,
           "beginsPattern": "Build start",
-          "endsPattern": "(Build complete|Rebuilt)"
+          "endsPattern": "Rebuilt"
         }
       },
       "presentation": {
