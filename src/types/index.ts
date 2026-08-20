@@ -64,3 +64,11 @@ export interface IntentEntry {
   timestamp: number;
   suggestionPreview?: string;
 }
+
+export interface CacheEntry<T> {
+  value: T
+  accessCount: number;
+  lastAccessed: number;
+  groupKey: string | null;
+  expiresAt: number | null;
+}
