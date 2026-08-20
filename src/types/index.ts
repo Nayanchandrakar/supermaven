@@ -48,5 +48,9 @@ export interface PendingCompletion {
 export interface PendingIntent {
   type: IntentType;
   filePath: string;
+  startTime: number;
+  lastActivityTime: number;
   originalContent: Map<number, string>;
+  currentContent: Map<number, string>
+  affectedLines: Set<number>
 }
