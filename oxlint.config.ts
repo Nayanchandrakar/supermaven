@@ -22,7 +22,6 @@ export default defineConfig({
     "typescript/no-unsafe-assignment": "warn",
     "typescript/no-floating-promises": "error",
     "typescript/no-unsafe-type-assertion": "off",
-    "typescript/restrict-template-expressions": "off",
-    "no-plusplus": ["error", { allowForLoopAfterthoughts: true }]
+    "typescript/restrict-template-expressions": "off"
   }
 });

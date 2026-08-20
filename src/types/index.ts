@@ -51,6 +51,16 @@ export interface PendingIntent {
   startTime: number;
   lastActivityTime: number;
   originalContent: Map<number, string>;
-  currentContent: Map<number, string>
-  affectedLines: Set<number>
+  currentContent: Map<number, string>;
+  affectedLines: Set<number>;
+}
+
+export interface IntentEntry {
+  id: string;
+  type: IntentType;
+  filePath: string;
+  lineRange: { start: number; end: number };
+  content: string;
+  timestamp: number;
+  suggestionPreview?: string;
 }

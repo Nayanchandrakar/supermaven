@@ -1,11 +1,13 @@
-import { IntentType, PendingIntent } from "@/types";
 import * as vscode from "vscode";
+import { IntentEntry, IntentType, PendingIntent } from "@/types";
 
 export class IntentTrackerService implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   private lastDocumentVersion: Map<string, number> = new Map();
+  private buffer: IntentEntry[] = [];
   private pendingIntent: PendingIntent | null = null;
   private flushTimeout: NodeJS.Timeout | null = null;
+  private idCounter: number = 0;
 
   constructor() {
     this.registerListeners();
@@ -28,39 +30,46 @@ export class IntentTrackerService implements vscode.Disposable {
   private handleDocumentChange({ document, contentChanges }: vscode.TextDocumentChangeEvent) {
     if (document.uri.scheme !== "file") return;
 
-    const activeEditor = vscode.window.activeTextEditor
+    const activeEditor = vscode.window.activeTextEditor;
 
     if (!activeEditor || activeEditor.document.uri.toString() !== document.uri.toString()) return;
 
     const docKey = document.uri.toString();
-    const previousVersion = this.lastDocumentVersion.get(docKey)
+    const previousVersion = this.lastDocumentVersion.get(docKey);
     const currentVersion = document.version;
 
-    this.lastDocumentVersion.set(docKey, currentVersion)
+    this.lastDocumentVersion.set(docKey, currentVersion);
 
     if (previousVersion !== undefined && Math.abs(currentVersion - previousVersion) > 1) {
       if (this.pendingIntent && this.pendingIntent.filePath === document.uri.fsPath) {
         this.pendingIntent = null;
+        this.clearFlushTimeout();
       }
       return;
     }
 
     for (const change of contentChanges) {
-      this.processChange(document, change)
+      this.processChange(document, change);
     }
   }
 
-  private processChange(document: vscode.TextDocument, change: vscode.TextDocumentContentChangeEvent) {
-    const now = Date.now()
+  private processChange(
+    document: vscode.TextDocument,
+    change: vscode.TextDocumentContentChangeEvent
+  ) {
+    const now = Date.now();
     const line = change.range.start.line;
-    const filePath = document.uri.fsPath
-    const isPaste = change.text.length > 50
-    const currentLineContent = line < document.lineCount ? document.lineAt(line).text : ""
+    const filePath = document.uri.fsPath;
+    const isPaste = change.text.length > 50;
+    const currentLineContent = line < document.lineCount ? document.lineAt(line).text : "";
 
-    const canContinuePending = this.pendingIntent && this.pendingIntent.filePath === filePath && (now - this.pendingIntent?.lastActivityTime < 1500)
+    const canContinuePending =
+      this.pendingIntent &&
+      this.pendingIntent.filePath === filePath &&
+      now - this.pendingIntent?.lastActivityTime < 1500;
 
     if (!canContinuePending) {
-      this.finalizeIntent()
+      this.finalizeIntent();
     }
 
     if (!this.pendingIntent) {
@@ -72,69 +81,195 @@ export class IntentTrackerService implements vscode.Disposable {
         originalContent: new Map(),
         currentContent: new Map(),
         affectedLines: new Set()
-      }
+      };
     }
 
-    this.captureOriginalLineContent(change, line, currentLineContent)
+    this.captureOriginalLineContent(change, line, currentLineContent);
 
-    this.pendingIntent?.currentContent.set(line, currentLineContent)
-    this.pendingIntent?.affectedLines.add(line)
-    this.pendingIntent.lastActivityTime = now
+    this.pendingIntent?.currentContent.set(line, currentLineContent);
+    this.pendingIntent?.affectedLines.add(line);
+    this.pendingIntent.lastActivityTime = now;
 
     if (isPaste) {
-      this.pendingIntent.type = "pasted"
+      this.pendingIntent.type = "pasted";
     }
 
-    this.pendingIntent.type = this.classifyIntentType(this.pendingIntent)
+    this.pendingIntent.type = this.classifyIntentType(this.pendingIntent);
 
+    this.scheduleFlush();
+  }
+
+  private scheduleFlush() {
+    this.clearFlushTimeout();
+    this.flushTimeout = setTimeout(() => {
+      this.finalizeIntent();
+    }, 1500);
+  }
+
+  private clearFlushTimeout() {
+    if (this.flushTimeout) {
+      clearTimeout(this.flushTimeout);
+      this.flushTimeout = null;
+    }
   }
 
   private classifyIntentType(pendingIntent: PendingIntent): IntentType {
-    if (pendingIntent.type === "pasted") return "pasted"
+    if (pendingIntent.type === "pasted") return "pasted";
 
     let hasAddition: boolean = false;
     let hasEdit: boolean = false;
 
     for (const line of pendingIntent.affectedLines) {
-      const original = pendingIntent.originalContent.get(line) ?? ""
+      const original = pendingIntent.originalContent.get(line) ?? "";
 
-      const current = pendingIntent.currentContent.get(line) ?? ""
+      const current = pendingIntent.currentContent.get(line) ?? "";
 
       if (origin.trim().length === 0 && current.trim().length > 0) {
         hasAddition = true;
-
       } else if (original.trim() !== current.trim()) {
         hasEdit = true;
       }
     }
 
-
     if (hasEdit) return "edited";
-    if (hasAddition) return 'added'
+    if (hasAddition) return "added";
 
-    return 'edited'
+    return "edited";
   }
 
-  private captureOriginalLineContent(change: vscode.TextDocumentContentChangeEvent, line: number, currentLineContent: string) {
+  private captureOriginalLineContent(
+    change: vscode.TextDocumentContentChangeEvent,
+    line: number,
+    currentLineContent: string
+  ) {
     if (this.pendingIntent?.originalContent.has(line)) return;
 
-    let originalLineContent = currentLineContent
+    let originalLineContent = currentLineContent;
 
     if (change.rangeLength === 0 && change.text.length > 0) {
-      const startChar = change.range.start.character
-      originalLineContent = currentLineContent.slice(0, startChar) + currentLineContent.slice(startChar + change.text.length)
+      const startChar = change.range.start.character;
+      originalLineContent =
+        currentLineContent.slice(0, startChar) +
+        currentLineContent.slice(startChar + change.text.length);
     }
 
-    this.pendingIntent?.originalContent.set(line, originalLineContent)
+    this.pendingIntent?.originalContent.set(line, originalLineContent);
   }
 
   private finalizeIntent() {
+    this.clearFlushTimeout();
 
+    if (!this.pendingIntent) {
+      return;
+    }
+
+    const pending = this.pendingIntent;
+    this.pendingIntent = null;
+
+    let hasChange = false;
+
+    for (const line of pending.affectedLines) {
+      const original = pending.originalContent.get(line) ?? "";
+      const current = pending.currentContent.get(line) ?? "";
+
+      if (original !== current) {
+        hasChange = true;
+        break;
+      }
+    }
+
+    if (!hasChange) return;
+
+    const lines = Array.from(pending.affectedLines).sort((a, b) => a - b);
+
+    const startLine = lines[0]! + 1;
+    const endLine = lines[lines.length - 1]! + 1;
+    const contentLines: string[] = [];
+
+    for (const line of lines) {
+      const content = pending.currentContent.get(line);
+      if (content !== undefined) {
+        contentLines.push(content);
+      }
+    }
+
+    const content = contentLines.join("\n");
+
+    const entry: IntentEntry = {
+      id: `intent_${this.idCounter++}`,
+      type: pending.type,
+      filePath: pending.filePath,
+      lineRange: { start: startLine, end: endLine },
+      content,
+      timestamp: pending.lastActivityTime
+    };
+
+    const merged = this.maybeMergeWithDifferent(entry);
+
+    if (merged) {
+      const idx = this.buffer.findIndex((e) => e.id === merged.id);
+
+      if (idx !== -1) {
+        this.buffer[idx] = merged;
+      } else {
+        this.buffer.push(entry);
+
+        while (this.buffer.length > 35) {
+          this.buffer.shift();
+        }
+      }
+    }
   }
 
+  private maybeMergeWithDifferent(entry: IntentEntry): IntentEntry | null {
+    const now = Date.now();
 
-  private handleActiveEditorChange(_event: vscode.TextEditor | undefined) {
+    for (let i = this.buffer.length - 1; i >= 0; i--) {
+      const existing = this.buffer[i]!;
+      if (now - existing.timestamp > 5000) {
+        break;
+      }
+
+      if (existing.filePath !== entry.filePath) {
+        continue;
+      }
+
+      const overlap =
+        existing.lineRange.start <= entry.lineRange.end &&
+        entry.lineRange.start <= existing.lineRange.end;
+
+      const adjacent =
+        Math.abs(existing.lineRange.end - entry.lineRange.start) <= 1 ||
+        Math.abs(entry.lineRange.end - existing.lineRange.start) <= 1;
+
+      if (adjacent || overlap) {
+        const mergedType: IntentType =
+          existing.type === "edited" || entry.type === "edited"
+            ? "edited"
+            : existing.type === "pasted" || entry.type === "pasted"
+              ? "pasted"
+              : entry.type;
+
+        const mergedRange = {
+          start: Math.min(existing.lineRange.start, entry.lineRange.start),
+          end: Math.max(existing.lineRange.end, entry.lineRange.end)
+        };
+
+        return {
+          id: existing.id,
+          type: mergedType,
+          content: entry.content,
+          timestamp: entry.timestamp,
+          lineRange: mergedRange,
+          filePath: entry.filePath
+        };
+      }
+    }
+
+    return null;
   }
+
+  private handleActiveEditorChange(_event: vscode.TextEditor | undefined) {}
 
   dispose() {
     throw new Error("Method not implemented.");
