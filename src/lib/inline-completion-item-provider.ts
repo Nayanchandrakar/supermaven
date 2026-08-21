@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 
 import { CompletionCache } from "@/cache/completion-cache";
 import { ApiClient } from "@/lib/api-client";
+import { ContextGatherer } from "@/lib/context-gatherer";
 import { IntentTrackerService } from "@/services/intent-tracker-service";
 import type { ChatMessage, PendingCompletion, ReplacementEdit } from "@/types";
 
@@ -15,8 +16,9 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     private readonly outputChannel: vscode.OutputChannel,
     private readonly apiClient: ApiClient,
     private readonly intentTracker: IntentTrackerService,
-    private readonly completionCache: CompletionCache
-  ) { }
+    private readonly completionCache: CompletionCache,
+    private readonly contextGatherer: ContextGatherer
+  ) {}
 
   async provideInlineCompletionItems(
     document: vscode.TextDocument,
@@ -45,7 +47,7 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       return continuationResult;
     }
 
-    const prefix = document.getText(new vscode.Range(new vscode.Position(0, 0), position));
+    const prefix = await this.contextGatherer.gatherContext(document, position);
 
     if (token.isCancellationRequested) {
       this.logger("Request cancelled");
@@ -92,7 +94,7 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       return undefined;
     }
 
-    this.activateCompletion(cachedEdit, document);
+    return this.activateCompletion(cachedEdit, document);
   }
 
   private tryContinuePrediction(

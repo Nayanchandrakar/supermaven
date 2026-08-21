@@ -63,6 +63,13 @@
             "minimum": 5000,
             "maximum": 120000,
             "description": "Completion cache in TTL in seconds"
+          },
+          "cursor-tab.lspCacheMaxEntries": {
+            "type": "number",
+            "default": 100,
+            "minimum": 10,
+            "maximum": 1000,
+            "description": "Maximum entries in completion cache"
           }
         }
       }

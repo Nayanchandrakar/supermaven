@@ -14,6 +14,7 @@ export default defineConfig({
   rules: {
     "no-shadow": "off",
     "no-alert": "error",
+    "unicorn/no-array-sort": "off",
     "eslint/prefer-const": "error",
     "eslint/no-unused-vars": "error",
     "unicorn/empty-brace-spaces": "off",

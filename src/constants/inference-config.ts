@@ -14,5 +14,6 @@ export const DEFAULT_INFERENCE: CompletionConfig = {
   openrouterApiKey: "",
   completionCacheMaxEntries: 100,
   completionCacheTtlMs: 30000,
-  model: "stealth/ox-alpha"
+  model: "stealth/ox-alpha",
+  lspCacheMaxEntries: 100
 };

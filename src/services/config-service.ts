@@ -34,7 +34,11 @@ export class ConfigurationService implements vscode.Disposable {
         "openrouterApiKey",
         DEFAULT_INFERENCE.completionCacheMaxEntries
       ),
-      openrouterApiKey: config.get<string>("openrouterApiKey", DEFAULT_INFERENCE.openrouterApiKey)
+      openrouterApiKey: config.get<string>("openrouterApiKey", DEFAULT_INFERENCE.openrouterApiKey),
+      lspCacheMaxEntries: config.get<number>(
+        "lspCacheMaxEntries",
+        DEFAULT_INFERENCE.lspCacheMaxEntries
+      )
     };
   }
 
@@ -73,6 +77,10 @@ export class ConfigurationService implements vscode.Disposable {
 
   get completionCacheMaxEntries(): number {
     return this.config.completionCacheMaxEntries;
+  }
+
+  get lspCacheMaxEntries(): number {
+    return this.config.lspCacheMaxEntries;
   }
 
   onConfigChange(listener: (config: CompletionConfig) => void): vscode.Disposable {

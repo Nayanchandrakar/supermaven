@@ -18,6 +18,7 @@ export interface CompletionConfig {
   // Ceche settings
   completionCacheMaxEntries: number;
   completionCacheTtlMs: number;
+  lspCacheMaxEntries: number;
 }
 
 export interface Choice {
@@ -75,4 +76,21 @@ export interface CacheEntry<T> {
   lastAccessed: number;
   groupKey: string | null;
   expiresAt: number | null;
+}
+
+export interface EnclosingScopes {
+  enclosingFunction: vscode.DocumentSymbol | null;
+  enclosingClass: vscode.DocumentSymbol | null;
+  symbolsByName: Map<string, vscode.DocumentSymbol[]>;
+}
+
+export interface LineSpan {
+  start: number;
+  end: number;
+}
+
+export interface ImportBindings {
+  importedOriginalNames: Set<string>;
+  importedAliasesByOriginal: Map<string, Set<string>>;
+  importedLocalNames: Set<string>;
 }
