@@ -269,9 +269,9 @@ export class IntentTrackerService implements vscode.Disposable {
     return null;
   }
 
-  private handleActiveEditorChange(_event: vscode.TextEditor | undefined) { }
+  private handleActiveEditorChange(_event: vscode.TextEditor | undefined) {}
 
   dispose() {
-    this.disposables.forEach(d => d.dispose())
+    this.disposables.forEach((d) => d.dispose());
   }
 }

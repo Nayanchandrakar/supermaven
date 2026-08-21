@@ -14,6 +14,10 @@ export interface CompletionConfig {
   model: string;
   maxTokens: number;
   openrouterApiKey: string;
+
+  // Ceche settings
+  completionCacheMaxEntries: number;
+  completionCacheTtlMs: number
 }
 
 export interface Choice {
@@ -66,7 +70,7 @@ export interface IntentEntry {
 }
 
 export interface CacheEntry<T> {
-  value: T
+  value: T;
   accessCount: number;
   lastAccessed: number;
   groupKey: string | null;

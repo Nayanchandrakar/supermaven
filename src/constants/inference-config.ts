@@ -12,5 +12,7 @@ export const INFERENCE_CONFIG: Record<InferenceProvider, InferenceProviderConfig
 export const DEFAULT_INFERENCE: CompletionConfig = {
   maxTokens: 1000,
   openrouterApiKey: "",
+  completionCacheMaxEntries: 100,
+  completionCacheTtlMs: 30000,
   model: "poolside/laguna-s-2.1:free"
 };
