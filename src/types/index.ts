@@ -17,7 +17,7 @@ export interface CompletionConfig {
 
   // Ceche settings
   completionCacheMaxEntries: number;
-  completionCacheTtlMs: number
+  completionCacheTtlMs: number;
 }
 
 export interface Choice {

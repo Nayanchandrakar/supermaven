@@ -50,16 +50,16 @@
             "description": "Model to use for tab completion",
             "default": "poolside/laguna-s-2.1:free"
           },
-          "cursor-tab.completionCacheMaxEntries":{
-            "type":"number",
-            "default":100,
+          "cursor-tab.completionCacheMaxEntries": {
+            "type": "number",
+            "default": 100,
             "minimum": 10,
             "maximum": 1000,
             "description": "Maximum entries in completion cache"
           },
-          "cursor-tab.completionCacheTtlMs":{
-            "type":"number",
-            "default":30000,
+          "cursor-tab.completionCacheTtlMs": {
+            "type": "number",
+            "default": 30000,
             "minimum": 5000,
             "maximum": 120000,
             "description": "Completion cache in TTL in seconds"

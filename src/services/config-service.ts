@@ -26,8 +26,14 @@ export class ConfigurationService implements vscode.Disposable {
     return {
       model: config.get<string>("model", DEFAULT_INFERENCE.model),
       maxTokens: config.get<number>("maxTokens", DEFAULT_INFERENCE.maxTokens),
-      completionCacheTtlMs: config.get<number>("completionCacheTtlMs", DEFAULT_INFERENCE.completionCacheTtlMs),
-      completionCacheMaxEntries: config.get<number>("openrouterApiKey", DEFAULT_INFERENCE.completionCacheMaxEntries),
+      completionCacheTtlMs: config.get<number>(
+        "completionCacheTtlMs",
+        DEFAULT_INFERENCE.completionCacheTtlMs
+      ),
+      completionCacheMaxEntries: config.get<number>(
+        "openrouterApiKey",
+        DEFAULT_INFERENCE.completionCacheMaxEntries
+      ),
       openrouterApiKey: config.get<string>("openrouterApiKey", DEFAULT_INFERENCE.openrouterApiKey)
     };
   }
