@@ -14,5 +14,5 @@ export const DEFAULT_INFERENCE: CompletionConfig = {
   openrouterApiKey: "",
   completionCacheMaxEntries: 100,
   completionCacheTtlMs: 30000,
-  model: "poolside/laguna-s-2.1:free"
+  model: "stealth/ox-alpha"
 };

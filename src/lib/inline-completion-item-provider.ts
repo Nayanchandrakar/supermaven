@@ -16,7 +16,7 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     private readonly apiClient: ApiClient,
     private readonly intentTracker: IntentTrackerService,
     private readonly completionCache: CompletionCache
-  ) {}
+  ) { }
 
   async provideInlineCompletionItems(
     document: vscode.TextDocument,

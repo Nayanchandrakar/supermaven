@@ -48,7 +48,7 @@
           "cursor-tab.model": {
             "type": "string",
             "description": "Model to use for tab completion",
-            "default": "poolside/laguna-s-2.1:free"
+            "default": "stealth/ox-alpha"
           },
           "cursor-tab.completionCacheMaxEntries": {
             "type": "number",
