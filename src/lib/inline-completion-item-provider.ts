@@ -1,6 +1,9 @@
 import * as vscode from "vscode";
+
+import { CompletionCache } from "@/cache/completion-cache";
 import { ApiClient } from "@/lib/api-client";
-import { ChatMessage, PendingCompletion, ReplacementEdit } from "@/types";
+import { IntentTrackerService } from "@/services/intent-tracker-service";
+import type { ChatMessage, PendingCompletion, ReplacementEdit } from "@/types";
 
 export class InlineCompletionItemProvider implements vscode.InlineCompletionItemProvider {
   private pendingCompletion: PendingCompletion | null = null;
@@ -10,7 +13,9 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
 
   constructor(
     private readonly outputChannel: vscode.OutputChannel,
-    private readonly apiClient: ApiClient
+    private readonly apiClient: ApiClient,
+    private readonly intentTracker: IntentTrackerService,
+    private readonly completionCache: CompletionCache
   ) {}
 
   async provideInlineCompletionItems(
@@ -25,6 +30,13 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
 
     if (pendingCompletionResult !== undefined) {
       return pendingCompletionResult!;
+    }
+
+    const editHistoryHash = this.intentTracker.computeHash();
+    const cachedResult = this.tryCachedCompletion(document, position, editHistoryHash);
+
+    if (cachedResult) {
+      return cachedResult;
     }
 
     const continuationResult = this.tryContinuePrediction(document, position);
@@ -60,7 +72,27 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       this.logger(`Api error: ${error}`);
     }
 
-    return this.activateCompletion({ insertText: result, startPosition: position }, document);
+    const edit: ReplacementEdit = { insertText: result, startPosition: position };
+
+    this.completionCache.set(document, position, editHistoryHash, edit);
+
+    return this.activateCompletion(edit, document);
+  }
+
+  private tryCachedCompletion(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+    editHistory: string
+  ): vscode.InlineCompletionList | undefined {
+    const cachedEdit = this.completionCache.get(document, position, editHistory);
+
+    this.logger(`Cache hit ${cachedEdit?.insertText}`);
+
+    if (!cachedEdit) {
+      return undefined;
+    }
+
+    this.activateCompletion(cachedEdit, document);
   }
 
   private tryContinuePrediction(
