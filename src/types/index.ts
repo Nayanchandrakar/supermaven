@@ -94,3 +94,10 @@ export interface ImportBindings {
   importedAliasesByOriginal: Map<string, Set<string>>;
   importedLocalNames: Set<string>;
 }
+
+export interface DefinitionTarget {
+  uri: vscode.Uri;
+  range: vscode.Range;
+}
+
+export type RawTypeHeirarchyItems = vscode.TypeHierarchyItem | vscode.TypeHierarchyItem[];

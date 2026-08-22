@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { BoundedCache } from "@/cache/bounded-cache";
+import { DefinitionTarget, RawTypeHeirarchyItems } from "@/types";
 import { createCacheKey } from "@/utils/create-cache-key";
 import { getConfigService } from "./config-service";
 
@@ -58,6 +59,63 @@ export class LSPService implements vscode.Disposable {
     } catch {
       return [];
     }
+  }
+
+  async getSuperTypeNames(
+    document: vscode.TextDocument,
+    position: vscode.Position
+  ): Promise<string[]> {
+    const documentUri = document.uri.toString();
+
+    const cacheKey = createCacheKey(
+      documentUri,
+      "superTypes",
+      `${position.line}:${position.character}`
+    );
+
+    const cached = this.cache.get(cacheKey) as string[] | undefined;
+
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const prepared = await vscode.commands.executeCommand<RawTypeHeirarchyItems>(
+      "vscode.prepareTypeHeirarchy",
+      documentUri,
+      position
+    );
+
+    if (!prepared) {
+      return [];
+    }
+
+    const roots: DefinitionTarget[] = Array.isArray(prepared) ? prepared : [prepared];
+
+    const superTypeResults = await Promise.allSettled(
+      roots.map((item) =>
+        vscode.commands.executeCommand<vscode.TypeHierarchyItem[]>(
+          "vscode.providerSuperTypes",
+          item
+        )
+      )
+    );
+
+    const names: string[] = [];
+
+    for (const result of superTypeResults) {
+      if (result.status !== "fulfilled" || !result.value) {
+        continue;
+      }
+
+      for (const item of result.value) {
+        names.push(item.name);
+      }
+    }
+
+    const unique = [...new Set(names)];
+    this.cache.set(cacheKey, unique, { groupKey: documentUri });
+
+    return unique;
   }
 
   dispose() {
