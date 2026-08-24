@@ -91,31 +91,35 @@ export class LSPService implements vscode.Disposable {
 
     const roots: DefinitionTarget[] = Array.isArray(prepared) ? prepared : [prepared];
 
-    const superTypeResults = await Promise.allSettled(
-      roots.map((item) =>
-        vscode.commands.executeCommand<vscode.TypeHierarchyItem[]>(
-          "vscode.providerSuperTypes",
-          item
+    try {
+      const superTypeResults = await Promise.allSettled(
+        roots.map((item) =>
+          vscode.commands.executeCommand<vscode.TypeHierarchyItem[]>(
+            "vscode.providerSuperTypes",
+            item
+          )
         )
-      )
-    );
+      );
 
-    const names: string[] = [];
+      const names: string[] = [];
 
-    for (const result of superTypeResults) {
-      if (result.status !== "fulfilled" || !result.value) {
-        continue;
+      for (const result of superTypeResults) {
+        if (result.status !== "fulfilled" || !result.value) {
+          continue;
+        }
+
+        for (const item of result.value) {
+          names.push(item.name);
+        }
       }
 
-      for (const item of result.value) {
-        names.push(item.name);
-      }
+      const unique = [...new Set(names)];
+      this.cache.set(cacheKey, unique, { groupKey: documentUri });
+
+      return unique;
+    } catch {
+      return [];
     }
-
-    const unique = [...new Set(names)];
-    this.cache.set(cacheKey, unique, { groupKey: documentUri });
-
-    return unique;
   }
 
   dispose() {
