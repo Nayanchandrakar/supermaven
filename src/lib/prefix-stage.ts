@@ -9,6 +9,7 @@ import { extractIdentifiers, getTruncationMarker } from "@/utils/language";
 export class PrefixStage {
   constructor(
     private readonly lspService: LSPService,
+    private readonly outputChannel: vscode.OutputChannel,
     private readonly localDependencyResolve: LocaleDependencyResolver
   ) {}
 
@@ -40,6 +41,8 @@ export class PrefixStage {
     const functionStartLine = scopes.enclosingFunction?.range.start.line ?? cursorLine;
     const classHeaderLines = this.collectClassHeaderLines(document, scopes, functionStartLine);
 
+    this.logger(classHeaderLines.join("\n"));
+
     if (!isLargeFunction) {
       const functionLines = this.collectLinesToCursor(document, functionStartLine, position);
 
@@ -69,7 +72,7 @@ export class PrefixStage {
 
     const functionSetupLines = this.collectLinesToCursor(
       document,
-      functionSetupEnd,
+      functionStartLine,
       new vscode.Position(functionSetupEnd + 1, 0)
     );
     const recentContextLines = this.collectLinesToCursor(
@@ -126,7 +129,7 @@ export class PrefixStage {
 
     return this.collectLinesToCursor(
       document,
-      functionStartLine,
+      classStartLine,
       new vscode.Position(classHeaderEnd + 1, 0)
     );
   }
@@ -304,6 +307,10 @@ export class PrefixStage {
 
   getVerbatimPrefix(document: vscode.TextDocument, position: vscode.Position) {
     return this.collectLinesToCursor(document, 0, position).join("\n");
+  }
+
+  private logger(message: string) {
+    this.outputChannel.appendLine(`[Prefix-stage] ${message}`);
   }
 
   private collectLinesToCursor(

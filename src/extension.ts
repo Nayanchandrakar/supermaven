@@ -18,7 +18,7 @@ export function activate(context: vscode.ExtensionContext) {
   const intentTracker = new IntentTrackerService();
   const lspService = new LSPService();
   const localDependencyResolver = new LocaleDependencyResolver(lspService);
-  const prefixStage = new PrefixStage(lspService, localDependencyResolver);
+  const prefixStage = new PrefixStage(lspService, outputChannel, localDependencyResolver);
   const contextGatherer = new ContextGatherer(intentTracker, prefixStage, lspService);
 
   const provider = new InlineCompletionItemProvider(
