@@ -4,105 +4,97 @@ import { LSPService } from "@/services/lsp-service";
 import { EnclosingScopes } from "@/types";
 
 export class LocaleDependencyResolver {
-    constructor(private readonly lspService: LSPService) { }
+  constructor(private readonly lspService: LSPService) {}
 
-    async collectSameFileDependencies(
-        document: vscode.TextDocument,
-        scopes: EnclosingScopes,
-        usedIdentifiers: Set<string>,
-        position: vscode.Position
-    ): Promise<string[]> {
+  async collectSameFileDependencies(
+    document: vscode.TextDocument,
+    scopes: EnclosingScopes,
+    usedIdentifiers: Set<string>,
+    position: vscode.Position
+  ): Promise<string[]> {
+    const output: string[] = [];
+    const includedSymbols = new Set<string>();
 
-        const output: string[] = []
-        const includedSymbols = new Set<string>()
+    if (scopes.enclosingClass) {
+      const classStartLine = scopes.enclosingClass.range.start.line;
+      const classNamePosition = scopes.enclosingClass.selectionRange.start;
+      const baseNames = await this.lspService.getSuperTypeNames(document, classNamePosition);
 
+      for (const baseName of baseNames) {
+        if (!includedSymbols.has(baseName)) continue;
 
-        if (scopes.enclosingClass) {
-            const classStartLine = scopes.enclosingClass.range.start.line;
-            const classNamePosition = scopes.enclosingClass.selectionRange.start
-            const baseNames = await this.lspService.getSuperTypeNames(document, classNamePosition)
+        const baseSymbol = this.findNearestSymbolBeforeLine(
+          scopes.symbolsByName,
+          baseName,
+          classStartLine
+        );
 
-            for (const baseName of baseNames) {
+        if (!baseSymbol) continue;
 
-                if (!includedSymbols.has(baseName)) continue;
-
-                const baseSymbol = this.findNearestSymbolBeforeLine(
-                    scopes.symbolsByName,
-                    baseName,
-                    classStartLine
-                )
-
-                if (!baseSymbol) continue;
-
-                output.push("")
-                output.push(...this.getSymbolLines(document, baseSymbol))
-                includedSymbols.add(baseName)
-            }
-        }
-
-        for (const identifier of usedIdentifiers) {
-            if (includedSymbols.has(identifier)) continue;
-
-            const symbol = this.findNearestSymbolBeforeLine(
-                scopes.symbolsByName,
-                identifier,
-                position.line
-            )
-
-            if (!symbol) continue;
-
-            output.push("")
-            output.push(...this.getSymbolLines(document, symbol))
-            includedSymbols.add(identifier)
-        }
-
-        return output
+        output.push("");
+        output.push(...this.getSymbolLines(document, baseSymbol));
+        includedSymbols.add(baseName);
+      }
     }
 
+    for (const identifier of usedIdentifiers) {
+      if (includedSymbols.has(identifier)) continue;
 
-    private isClassSymbol(kind: vscode.SymbolKind): boolean {
-        return [
-            vscode.SymbolKind.Class,
-            vscode.SymbolKind.Interface,
-            vscode.SymbolKind.Struct,
-            vscode.SymbolKind.Enum
-        ].includes(kind);
+      const symbol = this.findNearestSymbolBeforeLine(
+        scopes.symbolsByName,
+        identifier,
+        position.line
+      );
+
+      if (!symbol) continue;
+
+      output.push("");
+      output.push(...this.getSymbolLines(document, symbol));
+      includedSymbols.add(identifier);
     }
 
+    return output;
+  }
 
-    private getSymbolLines(
-        document: vscode.TextDocument,
-        symbol: vscode.DocumentSymbol,
-    ): string[] {
-        const lines: string[] = [];
+  private isClassSymbol(kind: vscode.SymbolKind): boolean {
+    return [
+      vscode.SymbolKind.Class,
+      vscode.SymbolKind.Interface,
+      vscode.SymbolKind.Struct,
+      vscode.SymbolKind.Enum
+    ].includes(kind);
+  }
 
-        for (let i = symbol.range.start.line; i <= symbol.range.end.line; i++) {
-            lines.push(document.lineAt(i).text);
-        }
+  private getSymbolLines(document: vscode.TextDocument, symbol: vscode.DocumentSymbol): string[] {
+    const lines: string[] = [];
 
-        return lines;
+    for (let i = symbol.range.start.line; i <= symbol.range.end.line; i++) {
+      lines.push(document.lineAt(i).text);
     }
 
-    private findNearestSymbolBeforeLine(
-        symbolsByName: Map<string, vscode.DocumentSymbol[]>,
-        name: string,
-        lineExclusive: number,
-    ): vscode.DocumentSymbol | null {
+    return lines;
+  }
 
-        const candidates = symbolsByName.get(name)
+  private findNearestSymbolBeforeLine(
+    symbolsByName: Map<string, vscode.DocumentSymbol[]>,
+    name: string,
+    lineExclusive: number
+  ): vscode.DocumentSymbol | null {
+    const candidates = symbolsByName.get(name);
 
-        if (!candidates || candidates.length === 0) return null;
+    if (!candidates || candidates.length === 0) return null;
 
-        let best: vscode.DocumentSymbol | null = null;
+    let best: vscode.DocumentSymbol | null = null;
 
-        for (const candidate of candidates) {
-            if (candidate.range.end.line >= lineExclusive || !this.isClassSymbol(candidate.kind)) continue;
+    for (const candidate of candidates) {
+      if (candidate.range.end.line >= lineExclusive || !this.isClassSymbol(candidate.kind))
+        continue;
 
-            if (!best || candidate.range.end.line > best.range.end.line) {
-                best = candidate
-            }
-        }
-
-        return best;
+      if (!best || candidate.range.end.line > best.range.end.line) {
+        best = candidate;
+      }
     }
+
+    return best;
+  }
 }

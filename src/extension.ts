@@ -6,6 +6,7 @@ import { ContextGatherer } from "@/lib/context-gatherer";
 import { InlineCompletionItemProvider } from "@/lib/inline-completion-item-provider";
 import { PrefixStage } from "@/lib/prefix-stage";
 import { IntentTrackerService } from "@/services/intent-tracker-service";
+import { LocaleDependencyResolver } from "./lib/local-dependency-resolver";
 import { LSPService } from "./services/lsp-service";
 
 export function activate(context: vscode.ExtensionContext) {
@@ -16,7 +17,8 @@ export function activate(context: vscode.ExtensionContext) {
   const apiClient = new ApiClient(outputChannel);
   const intentTracker = new IntentTrackerService();
   const lspService = new LSPService();
-  const prefixStage = new PrefixStage(lspService);
+  const localDependencyResolver = new LocaleDependencyResolver(lspService);
+  const prefixStage = new PrefixStage(lspService, localDependencyResolver);
   const contextGatherer = new ContextGatherer(intentTracker, prefixStage, lspService);
 
   const provider = new InlineCompletionItemProvider(

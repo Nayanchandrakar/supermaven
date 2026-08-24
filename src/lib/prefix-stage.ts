@@ -1,12 +1,16 @@
 import * as vscode from "vscode";
 
+import { LocaleDependencyResolver } from "@/lib/local-dependency-resolver";
 import { LSPService } from "@/services/lsp-service";
 import { EnclosingScopes } from "@/types";
 import { findImportLineSpans, parseImportBindings } from "@/utils/import-analysis";
-import { extractIdentifiers } from "@/utils/language";
+import { extractIdentifiers, getTruncationMarker } from "@/utils/language";
 
 export class PrefixStage {
-  constructor(private readonly lspService: Pick<LSPService, "getDocumentSymbols">) {}
+  constructor(
+    private readonly lspService: LSPService,
+    private readonly localDependencyResolve: LocaleDependencyResolver
+  ) {}
 
   async buildPrefix(document: vscode.TextDocument, position: vscode.Position): Promise<string> {
     if (position.line < 150) {
@@ -45,6 +49,12 @@ export class PrefixStage {
       );
 
       const usedImports = this.getUsedImports(document, usedIdentifiers);
+      const sameFileDeps = await this.localDependencyResolve.collectSameFileDependencies(
+        document,
+        scopes,
+        usedIdentifiers,
+        position
+      );
 
       return this.assemblePrefixParts(
         usedImports,
@@ -53,6 +63,52 @@ export class PrefixStage {
         functionLines
       ).join("\n");
     }
+
+    const functionSetupEnd = Math.min(functionStartLine + 30, cursorLine);
+    const recentContextStart = Math.max(functionSetupEnd + 1, cursorLine - 100);
+
+    const functionSetupLines = this.collectLinesToCursor(
+      document,
+      functionSetupEnd,
+      new vscode.Position(functionSetupEnd + 1, 0)
+    );
+    const recentContextLines = this.collectLinesToCursor(
+      document,
+      recentContextStart,
+      new vscode.Position(position.line + 1, 0)
+    );
+
+    const usedIdentifiers = extractIdentifiers(
+      [...classHeaderLines, ...functionSetupLines, recentContextLines].join("\n"),
+      document.languageId
+    );
+
+    const usedImports = this.getUsedImports(document, usedIdentifiers);
+    const sameFileDeps = await this.localDependencyResolve.collectSameFileDependencies(
+      document,
+      scopes,
+      usedIdentifiers,
+      position
+    );
+
+    const output = this.assemblePrefixParts(
+      usedImports,
+      sameFileDeps,
+      classHeaderLines,
+      functionSetupLines
+    );
+
+    if (recentContextLines.length > 0) {
+      const skippedLines = recentContextStart - functionSetupEnd;
+
+      if (skippedLines > 0) {
+        output.push(getTruncationMarker(document.languageId, skippedLines));
+      }
+
+      output.push(...recentContextLines);
+    }
+
+    return output.join("\n");
   }
 
   private collectClassHeaderLines(
