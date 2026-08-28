@@ -1,38 +1,40 @@
 import * as vscode from "vscode";
-import { DemoInlineCompletionProvider } from "./inline-completion-provider.js";
+
+import { CompletionCache } from "@/cache/completion-cache";
+import { ApiClient } from "@/lib/api-client";
+import { ContextGatherer } from "@/lib/context-gatherer";
+import { InlineCompletionItemProvider } from "@/lib/inline-completion-item-provider";
+import { PrefixStage } from "@/lib/prefix-stage";
+import { IntentTrackerService } from "@/services/intent-tracker-service";
+import { LocaleDependencyResolver } from "./lib/local-dependency-resolver";
+import { LSPService } from "./services/lsp-service";
 
 export function activate(context: vscode.ExtensionContext) {
-  const disposable = vscode.commands.registerCommand("cursor-tab.helloWorld", () => {
-    vscode.window.showInformationMessage("Hello World from cursor-tab!");
-  });
+  const outputChannel = vscode.window.createOutputChannel("Tab completion");
+  outputChannel.appendLine("Extension activated");
 
-  const showInlineCompletionDemo = vscode.commands.registerCommand(
-    "cursor-tab.showInlineCompletionDemo",
-    () => {
-      vscode.window.showInformationMessage(
-        "Try tab:hello, tab:choose, demoWord, tab:filter, tab:context, tab:slow or tab:accepted. See INLINE_COMPLETION_GUIDE.md for all examples."
-      );
-    }
+  const completionCache = new CompletionCache();
+  const apiClient = new ApiClient(outputChannel);
+  const intentTracker = new IntentTrackerService();
+  const lspService = new LSPService();
+  const localDependencyResolver = new LocaleDependencyResolver(lspService);
+  const prefixStage = new PrefixStage(lspService, outputChannel, localDependencyResolver);
+  const contextGatherer = new ContextGatherer(intentTracker, prefixStage, lspService);
+
+  const provider = new InlineCompletionItemProvider(
+    outputChannel,
+    apiClient,
+    intentTracker,
+    completionCache,
+    contextGatherer
   );
 
-  const inlineCompletionAccepted = vscode.commands.registerCommand(
-    "cursor-tab.inlineCompletionAccepted",
-    (trigger: unknown) => {
-      vscode.window.setStatusBarMessage(`Accepted the completion for ${String(trigger)}.`, 2000);
-    }
+  const disposable = vscode.languages.registerInlineCompletionItemProvider(
+    { pattern: "**" },
+    provider
   );
 
-  const inlineCompletionProvider = vscode.languages.registerInlineCompletionItemProvider(
-    [{ scheme: "file" }, { scheme: "untitled" }],
-    new DemoInlineCompletionProvider()
-  );
-
-  context.subscriptions.push(
-    disposable,
-    showInlineCompletionDemo,
-    inlineCompletionAccepted,
-    inlineCompletionProvider
-  );
+  context.subscriptions.push(disposable, outputChannel);
 }
 
 export function deactivate() {}

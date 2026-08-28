@@ -136,3 +136,6 @@ cdk.out
 *.pem
 
 *.vsix
+
+# playground script
+src/playground.ts
