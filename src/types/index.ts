@@ -108,7 +108,7 @@ export interface ReplacementRegion {
 export interface IndexedSymbol {
   name: string;
   kind: number;
-  containerName: string;
+  containerName?: string;
   uri: string;
   range: {
     startLine: number;
@@ -117,6 +117,12 @@ export interface IndexedSymbol {
     endCharacter: number;
   };
   signature?: string;
+}
+
+export interface NearbyContext {
+  referenceNames: Set<string>;
+  declaredIdentifiers: Set<string>;
+  nearbyIdentifiers: Set<string>;
 }
 
 
