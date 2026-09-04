@@ -100,4 +100,9 @@ export interface DefinitionTarget {
   range: vscode.Range;
 }
 
+export interface ReplacementRegion {
+  text: string;
+  range: vscode.Range
+}
+
 export type RawTypeHeirarchyItems = vscode.TypeHierarchyItem | vscode.TypeHierarchyItem[];
