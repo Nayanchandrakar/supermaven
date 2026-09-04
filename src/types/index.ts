@@ -105,4 +105,19 @@ export interface ReplacementRegion {
   range: vscode.Range
 }
 
+export interface IndexedSymbol {
+  name: string;
+  kind: number;
+  containerName: string;
+  uri: string;
+  range: {
+    startLine: number;
+    startCharacter: number;
+    endLine: number;
+    endCharacter: number;
+  };
+  signature?: string;
+}
+
+
 export type RawTypeHeirarchyItems = vscode.TypeHierarchyItem | vscode.TypeHierarchyItem[];

@@ -9,6 +9,8 @@ import { IntentTrackerService } from "@/services/intent-tracker-service";
 import { LocaleDependencyResolver } from "@/lib/local-dependency-resolver";
 import { LSPService } from "@/services/lsp-service";
 import { AstService } from "@/services/ast-service";
+import { ReplacementRegionStage } from "@/lib/replacement-region-stage";
+import { SuffixStage } from "@/lib/suffix-stage";
 
 export function activate(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel("Tab completion");
@@ -37,7 +39,9 @@ export function activate(context: vscode.ExtensionContext) {
 
   const localDependencyResolver = new LocaleDependencyResolver(lspService);
   const prefixStage = new PrefixStage(lspService, outputChannel, localDependencyResolver);
-  const contextGatherer = new ContextGatherer(intentTracker, prefixStage, lspService);
+  const replacementRegionStage = new ReplacementRegionStage(astService)
+  const suffixStage = new SuffixStage()
+  const contextGatherer = new ContextGatherer(intentTracker, prefixStage, lspService, replacementRegionStage, suffixStage);
 
   const provider = new InlineCompletionItemProvider(
     outputChannel,

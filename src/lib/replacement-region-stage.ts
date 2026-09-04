@@ -1,6 +1,7 @@
 import type { ReplacementRegion } from '@/types'
 import { AstService } from '@/services/ast-service'
 import * as vscode from 'vscode'
+import { findStatementEnd } from '@/utils/ast-analysis';
 
 
 export class ReplacementRegionStage {
@@ -16,9 +17,16 @@ export class ReplacementRegionStage {
         const shouldTryExtension = textAfterCursor.trim().length > 0 && this.shouldExtendRegion(textAfterCursor)
 
         if (shouldTryExtension && textAfterCursor.length < 200) {
-            this.extendToStatementEnd(document, position, 200 - textAfterCursor.length, 200)
+            const extension = this.extendToStatementEnd(document, position, 200 - textAfterCursor.length, 3)
+
+            if (extension) {
+                textAfterCursor = extension.text;
+                endLine = extension.endLine;
+                endChar = extension.endChar;
+            }
         }
 
+        return { text: textAfterCursor, range: new vscode.Range(position, new vscode.Position(endLine, endChar)) }
     }
 
     private shouldExtendRegion(textAfterCursor: string): boolean {
