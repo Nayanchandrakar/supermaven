@@ -37,6 +37,7 @@ lib-cov
 # build outputs
 build
 dist
+grammars
 .output
 build/Release/
 out

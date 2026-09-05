@@ -5,6 +5,8 @@ import { ApiClient } from "@/lib/api-client";
 import { ContextGatherer } from "@/lib/context-gatherer";
 import { IntentTrackerService } from "@/services/intent-tracker-service";
 import type { ChatMessage, PendingCompletion, ReplacementEdit } from "@/types";
+import { PromptBuilder } from "@/services/prompt-builder";
+import { DeduplicationService } from "@/services/deduplication-service";
 
 export class InlineCompletionItemProvider implements vscode.InlineCompletionItemProvider {
   private pendingCompletion: PendingCompletion | null = null;
@@ -17,8 +19,10 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     private readonly apiClient: ApiClient,
     private readonly intentTracker: IntentTrackerService,
     private readonly completionCache: CompletionCache,
-    private readonly contextGatherer: ContextGatherer
-  ) {}
+    private readonly contextGatherer: ContextGatherer,
+    private readonly promptBuilder: PromptBuilder,
+    private readonly deduplicationService: DeduplicationService
+  ) { }
 
   async provideInlineCompletionItems(
     document: vscode.TextDocument,
@@ -47,7 +51,10 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       return continuationResult;
     }
 
-    const prefix = await this.contextGatherer.gatherContext(document, position);
+    const completionContext = await this.contextGatherer.gatherContext(document, position);
+    const messages = this.promptBuilder.buildPrompt(completionContext)
+
+    this.logger(`Prefix: ${JSON.stringify(completionContext)}`)
 
     if (token.isCancellationRequested) {
       this.logger("Request cancelled");
@@ -56,28 +63,23 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
 
     let result = "";
     try {
-      result = await this.callCompletionApi(
-        [
-          {
-            role: "system",
-            content:
-              "You are an AI code assistant. Provide concise and context-aware code completions. Only respond with the most likely next lines of code, no explanations."
-          },
-          {
-            role: "user",
-            content: prefix
-          }
-        ],
-        token
-      );
+      result = await this.callCompletionApi(messages, token);
     } catch (error) {
       this.logger(`Api error: ${error}`);
+    }
+
+
+    result = this.cleanCompletionText(result)
+    const dedupResult = this.deduplicationService.check(document, position, result)
+
+    if (!dedupResult.proceed) {
+      this.logger(`Deduplication rejected: ${dedupResult.reasonText ?? "no reason provider"}`)
+      return null;
     }
 
     const edit: ReplacementEdit = { insertText: result, startPosition: position };
 
     this.completionCache.set(document, position, editHistoryHash, edit);
-
     return this.activateCompletion(edit, document);
   }
 
@@ -174,6 +176,14 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     }
 
     return result;
+  }
+
+
+  private cleanCompletionText(text: string): string {
+    let cleaned = text.replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
+    const explanationPattern = /\n\n(?:\/\/|\/\*|#|Note:|Explanation:)[\s\S]*$/;
+    cleaned = cleaned.replace(explanationPattern, '');
+    return cleaned.trimEnd();
   }
 
   private handlePendingCompletionCheck(

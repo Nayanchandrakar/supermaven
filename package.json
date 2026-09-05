@@ -16,11 +16,16 @@
     "format:check": "oxfmt --check",
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
+    "postinstall": "bun scripts/setup-grammars.ts",
     "prepare": "husky"
+  },
+  "dependencies": {
+    "web-tree-sitter": "^0.27.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
+    "@types/emscripten": "^1.41.6",
     "@types/node": "^26.2.0",
     "@types/vscode": "^1.125.0",
     "husky": "^9.1.7",
@@ -28,6 +33,19 @@
     "oxfmt": "^0.63.0",
     "oxlint": "^1.78.0",
     "oxlint-tsgolint": "^7.0.2001",
+    "tree-sitter-bash": "^0.25.1",
+    "tree-sitter-c": "^0.24.1",
+    "tree-sitter-cpp": "^0.23.4",
+    "tree-sitter-css": "^0.25.0",
+    "tree-sitter-go": "^0.25.0",
+    "tree-sitter-html": "^0.23.2",
+    "tree-sitter-java": "^0.23.5",
+    "tree-sitter-javascript": "^0.25.0",
+    "tree-sitter-python": "^0.25.0",
+    "tree-sitter-ruby": "^0.23.1",
+    "tree-sitter-rust": "^0.24.0",
+    "tree-sitter-scala": "^0.24.0",
+    "tree-sitter-typescript": "^0.23.2",
     "tsdown": "^0.22.14",
     "typescript": "^7.0.2"
   },
