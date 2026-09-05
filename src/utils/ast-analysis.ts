@@ -1,5 +1,6 @@
 import * as TreeSitter from 'web-tree-sitter';
 
+
 const DECLARATION_NODE_TYPES = new Set([
     'function_declaration',
     'function_definition',
@@ -38,6 +39,30 @@ const DECLARATOR_TYPES = new Set([
     'lexical_declaration',
     'variable_declaration',
 ]);
+
+const CLASS_NODE_TYPES = new Set([
+    'class_declaration',
+    'class_definition',
+]);
+
+const FUNCTION_NODE_TYPES = new Set([
+    'function_declaration',
+    'function_definition',
+    'function_item',
+    'method_definition',
+    'arrow_function',
+]);
+
+const INTERFACE_NODE_TYPES = new Set([
+    'interface_declaration',
+]);
+
+const VARIABLE_NODE_TYPES = new Set([
+    'lexical_declaration',
+    'variable_declaration',
+    'variable_declarator',
+]);
+
 
 function containsPosition(node: TreeSitter.Node, row: number, column: number): boolean {
     const start = node.startPosition;
@@ -214,3 +239,156 @@ function extractNameFromNode(node: TreeSitter.Node, names: Set<string>): void {
     }
 }
 
+
+export function extractSignatureFromAST(
+    tree: TreeSitter.Tree,
+    symbolKind: number
+): string | undefined {
+    const root = tree.rootNode;
+
+    const KIND_INTERFACE = 10;
+    const KIND_CLASS = 4;
+    const KIND_FUNCTION = 11;
+    const KIND_METHOD = 5;
+    const KIND_ENUM = 9;
+    const KIND_VARIABLE = 12;
+    const KIND_CONSTANT = 13;
+    const KIND_STRUCT = 22;
+    const KIND_TYPE_PARAMETER = 25;
+
+    if (symbolKind === KIND_INTERFACE) {
+        return extractInterfaceOrClassSig(root, INTERFACE_NODE_TYPES);
+    }
+
+    if (symbolKind === KIND_CLASS || symbolKind === KIND_STRUCT) {
+        return extractInterfaceOrClassSig(root, CLASS_NODE_TYPES);
+    }
+
+    if (symbolKind === KIND_FUNCTION || symbolKind === KIND_METHOD) {
+        return extractFunctionSig(root);
+    }
+
+    if (symbolKind === KIND_ENUM) {
+        // Enums: return full text (already bounded by vscode range)
+        return root.text;
+    }
+
+    if (symbolKind === KIND_VARIABLE || symbolKind === KIND_CONSTANT) {
+        return extractVariableSig(root);
+    }
+
+    if (symbolKind === KIND_TYPE_PARAMETER) {
+        return root.text;
+    }
+
+    return root.text;
+}
+
+
+function extractInterfaceOrClassSig(
+    root: TreeSitter.Node,
+    targetTypes: Set<string>
+): string | undefined {
+    const decl = findFirstNodeOfType(root, targetTypes);
+    if (!decl) return undefined;
+
+    const body = decl.childForFieldName('body');
+    if (!body) {
+        return decl.text;
+    }
+
+    const parts: string[] = [];
+    const fullText = decl.text;
+    const headerEnd = body.startIndex - decl.startIndex;
+    const header = fullText.slice(0, headerEnd).trimEnd();
+    parts.push(header);
+
+    for (let i = 0; i < body.namedChildCount; i++) {
+        const member = body.namedChild(i);
+        if (!member) continue;
+
+        const memberBody = member.childForFieldName('body');
+        if (memberBody) {
+            // Method: take text up to body start
+            const memberText = member.text;
+            const memberBodyOffset = memberBody.startIndex - member.startIndex;
+            const sig = memberText.slice(0, memberBodyOffset).trimEnd();
+            parts.push('  ' + sig + ';');
+        } else {
+            // Property, field, or signature without body
+            parts.push('  ' + member.text.trimEnd());
+        }
+    }
+
+    parts.push('}');
+    return parts.join('\n');
+}
+
+function extractFunctionSig(root: TreeSitter.Node): string | undefined {
+    const func = findFirstNodeOfType(root, FUNCTION_NODE_TYPES);
+    if (!func) {
+        // Maybe the root itself is a function
+        if (FUNCTION_NODE_TYPES.has(root.type)) {
+            return extractFunctionSigFromNode(root);
+        }
+        return undefined;
+    }
+    return extractFunctionSigFromNode(func);
+}
+
+function extractFunctionSigFromNode(func: TreeSitter.Node): string | undefined {
+    const body = func.childForFieldName('body');
+    if (!body) {
+        return func.text;
+    }
+
+    const fullText = func.text;
+    const bodyOffset = body.startIndex - func.startIndex;
+    return fullText.slice(0, bodyOffset).trimEnd();
+}
+
+function extractVariableSig(root: TreeSitter.Node): string | undefined {
+    const decl = findFirstNodeOfType(root, VARIABLE_NODE_TYPES);
+    if (!decl) return undefined;
+
+    // For variable_declarator, remove the initializer value (keep type annotation)
+    for (let i = 0; i < decl.namedChildCount; i++) {
+        const child = decl.namedChild(i);
+        if (child && child.type === 'variable_declarator') {
+            const value = child.childForFieldName('value');
+            if (value) {
+                const text = decl.text;
+                const valueOffset = value.startIndex - decl.startIndex;
+                // Go back to find '=' before the value
+                let eqOffset = valueOffset;
+                while (eqOffset > 0 && text[eqOffset - 1] !== '=') {
+                    eqOffset--;
+                }
+                if (eqOffset > 0) {
+                    // Include the type annotation but not the value
+                    const sig = text.slice(0, eqOffset - 1).trimEnd();
+                    return sig + ';';
+                }
+            }
+        }
+    }
+
+    return decl.text;
+}
+
+
+function findFirstNodeOfType(
+    root: TreeSitter.Node,
+    types: Set<string>
+): TreeSitter.Node | null {
+    if (types.has(root.type)) return root;
+
+    for (let i = 0; i < root.namedChildCount; i++) {
+        const child = root.namedChild(i);
+        if (child) {
+            const found = findFirstNodeOfType(child, types);
+            if (found) return found;
+        }
+    }
+    return null;
+}
