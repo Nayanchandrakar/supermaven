@@ -87,7 +87,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   const acceptCompletionCommand = vscode.commands.registerCommand(
-    "cursor-tab.acceptCompletion",
+    "supermaven.acceptCompletion",
     async () => {
       outputChannel?.appendLine("[Extension] Accept completion command executed");
 

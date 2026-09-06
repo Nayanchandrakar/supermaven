@@ -31,7 +31,7 @@ export class ConfigurationService implements vscode.Disposable {
         DEFAULT_INFERENCE.completionCacheTtlMs
       ),
       completionCacheMaxEntries: config.get<number>(
-        "openrouterApiKey",
+        "completionCacheMaxEntries",
         DEFAULT_INFERENCE.completionCacheMaxEntries
       ),
       openrouterApiKey: config.get<string>("openrouterApiKey", DEFAULT_INFERENCE.openrouterApiKey),
