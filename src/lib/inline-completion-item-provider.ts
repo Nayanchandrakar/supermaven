@@ -7,6 +7,7 @@ import { IntentTrackerService } from "@/services/intent-tracker-service";
 import type { ChatMessage, PendingCompletion, ReplacementEdit } from "@/types";
 import { PromptBuilder } from "@/services/prompt-builder";
 import { DeduplicationService } from "@/services/deduplication-service";
+import { DeletionDecoration } from "@/utils/deletion-decoration";
 
 export class InlineCompletionItemProvider implements vscode.InlineCompletionItemProvider {
   private pendingCompletion: PendingCompletion | null = null;
@@ -21,8 +22,14 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     private readonly completionCache: CompletionCache,
     private readonly contextGatherer: ContextGatherer,
     private readonly promptBuilder: PromptBuilder,
-    private readonly deduplicationService: DeduplicationService
+    private readonly deduplicationService: DeduplicationService,
+    private readonly deletionDecoration: DeletionDecoration
   ) { }
+
+
+  getPendingEdit(): ReplacementEdit | null {
+    return this.pendingCompletion?.edit ?? null;
+  }
 
   async provideInlineCompletionItems(
     document: vscode.TextDocument,
@@ -77,7 +84,14 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       return null;
     }
 
-    const edit: ReplacementEdit = { insertText: result, startPosition: position };
+    const edit = this.computeMinimalReplacement(document, completionContext.replacementRegion.range.start, completionContext.replacementRegion.range.end, result)
+
+    if (!edit || edit.insertText.length === 0) {
+      this.logger(`No changes detected in the completion`);
+      return null;
+    }
+
+    this.logger(`Replacement Edit ${JSON.stringify(edit)}`)
 
     this.completionCache.set(document, position, editHistoryHash, edit);
     return this.activateCompletion(edit, document);
@@ -143,7 +157,7 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     document: vscode.TextDocument
   ): vscode.InlineCompletionList {
     this.lastCompletionText = edit.insertText;
-    this.lastCompletionPosition = edit.startPosition;
+    this.lastCompletionPosition = edit.deleteRange.start;
     this.lastCompletionUri = document.uri.toString();
 
     this.pendingCompletion = {
@@ -151,7 +165,15 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       edit
     };
 
-    return this.createInlineCompletionList(edit.insertText);
+    if (edit.deletedText.length > 0) {
+      const editor = vscode.window.activeTextEditor;
+      if (editor && editor.document.uri.toString() === document.uri.toString()) {
+        const decorationRange = edit.actualDeleteRange ?? edit.deleteRange
+        this.deletionDecoration.showDeletion(editor, decorationRange);
+      }
+    }
+
+    return this.createInlineCompletionList(edit.insertText, edit.deleteRange);
   }
 
   private createInlineCompletionList(
@@ -193,7 +215,7 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     if (!this.pendingCompletion) return undefined;
 
     const pendingDocumentUri = this.pendingCompletion.documentUri;
-    const pendingPosition = this.pendingCompletion.edit.startPosition;
+    const pendingPosition = this.pendingCompletion.edit.deleteRange.start;
 
     if (
       pendingDocumentUri !== document.uri.toString() ||
@@ -207,11 +229,63 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     return this.createInlineCompletionList(this.pendingCompletion.edit.insertText);
   }
 
-  private clearPendingCompletion() {
+  clearPendingCompletion() {
     this.pendingCompletion = null;
+    this.deletionDecoration.clearDecorations();
+  }
+
+  private computeMinimalReplacement(
+    document: vscode.TextDocument,
+    regionStart: vscode.Position,
+    regionEnd: vscode.Position,
+    newText: string
+  ): ReplacementEdit | null {
+    const oldText = document.getText(new vscode.Range(regionStart, regionEnd));
+    if (oldText === newText) {
+      return null;
+    }
+
+    const minLength = Math.min(oldText.length, newText.length);
+
+    let prefixLength = 0;
+    while (prefixLength < minLength && oldText[prefixLength] === newText[prefixLength]) {
+      prefixLength++;
+    }
+
+    let suffixLength = 0;
+    const maxSuffixLength = minLength - prefixLength;
+    while (
+      suffixLength < maxSuffixLength &&
+      oldText[oldText.length - 1 - suffixLength] === newText[newText.length - 1 - suffixLength]
+    ) {
+      suffixLength++;
+    }
+
+    const oldDiffEnd = oldText.length - suffixLength;
+    const newDiffEnd = newText.length - suffixLength;
+    const deletedText = oldText.slice(prefixLength, oldDiffEnd);
+
+    const regionStartOffset = document.offsetAt(regionStart);
+    const actualDeleteStart = document.positionAt(regionStartOffset + prefixLength);
+    const actualDeleteEnd = document.positionAt(regionStartOffset + oldDiffEnd);
+
+    return {
+      deleteRange: new vscode.Range(regionStart, actualDeleteEnd),
+      insertText: newText.slice(0, newDiffEnd),
+      deletedText,
+      actualDeleteRange: deletedText ? new vscode.Range(actualDeleteStart, actualDeleteEnd) : undefined,
+    };
   }
 
   private logger(message: string) {
     this.outputChannel.appendLine(`[Provider] ${message}`);
+  }
+
+  dispose(): void {
+    this.completionCache.dispose();
+    this.apiClient.dispose();
+    this.intentTracker.dispose();
+    this.contextGatherer.dispose();
+    this.deletionDecoration.dispose()
   }
 }

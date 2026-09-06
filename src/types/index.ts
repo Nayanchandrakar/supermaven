@@ -1,4 +1,3 @@
-import { CrossFileService } from "@/services/cross-file-service";
 import * as vscode from "vscode";
 
 export type InferenceProvider = "openrouter";
@@ -42,8 +41,10 @@ export interface ChatMessage {
 }
 
 export interface ReplacementEdit {
-  insertText: string;
-  startPosition: vscode.Position;
+  deleteRange: vscode.Range,
+  insertText: string,
+  deletedText: string;
+  actualDeleteRange: vscode.Range | undefined,
 }
 
 export interface PendingCompletion {
@@ -68,7 +69,6 @@ export interface IntentEntry {
   lineRange: { start: number; end: number };
   content: string;
   timestamp: number;
-  suggestionPreview?: string;
 }
 
 export interface CacheEntry<T> {

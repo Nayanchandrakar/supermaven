@@ -325,7 +325,44 @@ export class IntentTrackerService implements vscode.Disposable {
     return lines.join("\n");
   }
 
+  recordAcceptedSuggestion(filePath: string, line: number, content: string) {
+    this.finalizeIntent();
+    const entry: IntentEntry = {
+      content,
+      filePath,
+      type: 'accepted',
+      timestamp: Date.now(),
+      id: `intent_${++this.idCounter}`,
+      lineRange: { start: line, end: line },
+    }
+
+    this.buffer.push(entry);
+
+    while (this.buffer.length > 35) {
+      this.buffer.shift();
+    }
+  }
+
+
+  recordRejectedSuggestion(filePath: string, line: number, content: string) {
+    const entry: IntentEntry = {
+      content,
+      filePath,
+      type: 'rejected',
+      timestamp: Date.now(),
+      id: `intent_${++this.idCounter}`,
+      lineRange: { start: line, end: line },
+    }
+
+    this.buffer.push(entry);
+
+    while (this.buffer.length > 35) {
+      this.buffer.shift();
+    }
+  }
+
   dispose() {
+
     this.finalizeIntent();
     this.disposables.forEach((d) => d.dispose());
     this.clearFlushTimeout();

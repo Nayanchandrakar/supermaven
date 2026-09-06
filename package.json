@@ -54,6 +54,18 @@
     "*.{js,jsx,ts,tsx,mjs,cjs}": "bun run lint"
   },
   "contributes": {
+    "keybindings":[
+      {
+        "command": "cursor-tab.acceptCompletion",
+        "key": "tab",
+        "when":"editorTextFocus"
+      },
+       {
+        "command": "cursor-tab.rejectCompletion",
+        "key": "escape",
+        "when":"editorTextFocus"
+      }
+    ],
     "configuration": [
       {
         "title": "Cursor tab completion",
