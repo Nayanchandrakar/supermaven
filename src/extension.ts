@@ -11,6 +11,13 @@ import { LSPService } from "@/services/lsp-service";
 import { AstService } from "@/services/ast-service";
 import { ReplacementRegionStage } from "@/lib/replacement-region-stage";
 import { SuffixStage } from "@/lib/suffix-stage";
+import { DeduplicationService } from "@/services/deduplication-service";
+import { PromptBuilder } from "@/services/prompt-builder";
+import { CrossFileService } from "@/services/cross-file-service";
+import { SymbolIndex } from "@/utils/symbol-index";
+import { ReferenceExtractor } from "@/utils/reference-extractor";
+import { SignatureProvider } from "@/utils/signature-provider";
+
 
 export function activate(context: vscode.ExtensionContext) {
   const outputChannel = vscode.window.createOutputChannel("Tab completion");
@@ -41,14 +48,22 @@ export function activate(context: vscode.ExtensionContext) {
   const prefixStage = new PrefixStage(lspService, outputChannel, localDependencyResolver);
   const replacementRegionStage = new ReplacementRegionStage(astService)
   const suffixStage = new SuffixStage()
-  const contextGatherer = new ContextGatherer(intentTracker, prefixStage, lspService, replacementRegionStage, suffixStage);
+  const deduplicationService = new DeduplicationService()
+  const promptBuilder = new PromptBuilder()
+  const symbolIndex = new SymbolIndex(lspService)
+  const referenceExtractor = new ReferenceExtractor(astService)
+  const signatureProvider = new SignatureProvider(astService)
+  const crossFileService = new CrossFileService(lspService, symbolIndex, astService, referenceExtractor, signatureProvider)
+  const contextGatherer = new ContextGatherer(intentTracker, prefixStage, lspService, replacementRegionStage, suffixStage, crossFileService);
 
   const provider = new InlineCompletionItemProvider(
     outputChannel,
     apiClient,
     intentTracker,
     completionCache,
-    contextGatherer
+    contextGatherer,
+    promptBuilder,
+    deduplicationService,
   );
 
   const disposable = vscode.languages.registerInlineCompletionItemProvider(

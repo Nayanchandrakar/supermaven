@@ -4,11 +4,12 @@ import { AstService } from '@/services/ast-service';
 import { SymbolIndex } from '@/utils/symbol-index';
 import { IndexedSymbol } from '@/types';
 import { ReferenceExtractor } from '@/utils/reference-extractor';
+import { SignatureProvider } from '@/utils/signature-provider';
 
 export class CrossFileService implements vscode.Disposable {
     private readonly disposables: vscode.Disposable[] = []
 
-    constructor(private readonly lspService: LSPService, private readonly symbolIndex: SymbolIndex, private readonly astService: AstService, private readonly referenceExtractor: ReferenceExtractor) {
+    constructor(private readonly lspService: LSPService, private readonly symbolIndex: SymbolIndex, private readonly astService: AstService, private readonly referenceExtractor: ReferenceExtractor, private readonly signatureProvider: SignatureProvider) {
         this.registerListeners();
     }
 
@@ -28,8 +29,6 @@ export class CrossFileService implements vscode.Disposable {
         if (referencedCandidates.length === 0) {
             return []
         }
-
-
     }
 
     private registerListeners() {
@@ -45,5 +44,7 @@ export class CrossFileService implements vscode.Disposable {
 
     dispose() {
         this.disposables.forEach(d => d.dispose())
+        this.signatureProvider.clear();
+        this.symbolIndex.clear();
     }
 }

@@ -1,3 +1,4 @@
+import { CrossFileService } from "@/services/cross-file-service";
 import * as vscode from "vscode";
 
 export type InferenceProvider = "openrouter";
@@ -125,5 +126,40 @@ export interface NearbyContext {
   nearbyIdentifiers: Set<string>;
 }
 
+export interface CompletionContext {
+  prefix: string;
+  replacementRegion: ReplacementRegion
+  suffixAfterRegion: string;
+  cursorPosition: vscode.Position
+  languageId: string;
+  filePath: string;
+  editHistory: string;
+  crossFileSymbols: IndexedSymbol[]
+}
+
+export interface FitToBudgetInput {
+  systemPrompt: string;
+  prefix: string;
+  replaceRegion: string;
+  suffix: string;
+  importedSignatures: string[];
+  editHistory: string;
+  languageId: string;
+  promptOverheadTokens?: number;
+}
+
+export interface FitToBudgetResult {
+  prefix: string;
+  replaceRegion: string;
+  suffix: string;
+  importedSignatures: string;
+  editHistory: string;
+}
+
+export interface DedupOutput {
+  proceed: boolean;
+  completion: string;
+  reasonText?: string;
+}
 
 export type RawTypeHeirarchyItems = vscode.TypeHierarchyItem | vscode.TypeHierarchyItem[];
