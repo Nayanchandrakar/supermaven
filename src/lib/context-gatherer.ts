@@ -2,19 +2,15 @@ import * as vscode from "vscode";
 
 import { PrefixStage } from "@/lib/prefix-stage";
 import { IntentTrackerService } from "@/services/intent-tracker-service";
-import { LSPService } from "@/services/lsp-service";
 import { SuffixStage } from "@/lib/suffix-stage";
 import { CrossFileService } from "@/services/cross-file-service";
 import { CompletionContext } from "@/types";
 import { ReplacementRegionStage } from "@/lib/replacement-region-stage";
 
 export class ContextGatherer implements vscode.Disposable {
-  private readonly disposables: vscode.Disposable[] = [];
-
   constructor(
     private readonly intentTrackerService: IntentTrackerService,
     private readonly prefixStage: PrefixStage,
-    private readonly lspService: LSPService,
     private readonly replacementRegion: ReplacementRegionStage,
     private readonly suffixStage: SuffixStage,
     private readonly crossFileService: CrossFileService

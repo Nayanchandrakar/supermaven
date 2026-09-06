@@ -56,7 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
   const referenceExtractor = new ReferenceExtractor(astService)
   const signatureProvider = new SignatureProvider(astService)
   const crossFileService = new CrossFileService(lspService, symbolIndex, astService, referenceExtractor, signatureProvider)
-  const contextGatherer = new ContextGatherer(intentTracker, prefixStage, lspService, replacementRegionStage, suffixStage, crossFileService);
+  const contextGatherer = new ContextGatherer(intentTracker, prefixStage, replacementRegionStage, suffixStage, crossFileService);
   const deletionDecoration = new DeletionDecoration()
 
   const provider = new InlineCompletionItemProvider(
