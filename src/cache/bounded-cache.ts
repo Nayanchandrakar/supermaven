@@ -1,10 +1,12 @@
-import { CacheEntry } from "@/types";
+import type { CacheEntry } from "@/types";
 
 export class BoundedCache<T> {
-  private cache: Map<string, CacheEntry<T>> = new Map();
-  private groupIndex: Map<string, Set<string>> = new Map();
+  private cache = new Map<string, CacheEntry<T>>();
+  private groupIndex = new Map<string, Set<string>>();
+  private readonly maxSize: number;
 
-  constructor(private readonly maxSize: number) {
+  constructor(maxSize: number) {
+    this.maxSize = maxSize;
     if (maxSize < 1) {
       throw new Error("maxSize must be atleast 1");
     }
@@ -20,7 +22,7 @@ export class BoundedCache<T> {
 
     for (const key of keys) {
       if (this.cache.delete(key)) {
-        count++;
+        count += 1;
       }
     }
 
@@ -42,7 +44,7 @@ export class BoundedCache<T> {
     }
 
     entry.lastAccessed = Date.now();
-    entry.accessCount++;
+    entry.accessCount += 1;
     return entry.value;
   }
 
@@ -68,11 +70,11 @@ export class BoundedCache<T> {
     }
 
     const entry: CacheEntry<T> = {
-      value,
-      expiresAt: ttlMs !== null ? now + ttlMs : null,
-      lastAccessed: now,
       accessCount: 1,
-      groupKey
+      expiresAt: ttlMs === null ? null : now + ttlMs,
+      groupKey,
+      lastAccessed: now,
+      value,
     };
 
     this.cache.set(key, entry);

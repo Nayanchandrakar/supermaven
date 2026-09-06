@@ -1,8 +1,13 @@
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
 
 export type InferenceProvider = "openrouter" | "groq" | "fireworks";
 export type Role = "system" | "assistant" | "user";
-export type IntentType = "added" | "pasted" | "edited" | "accepted" | "rejected";
+export type IntentType =
+  | "added"
+  | "pasted"
+  | "edited"
+  | "accepted"
+  | "rejected";
 
 export interface InferenceProviderConfig {
   url: string;
@@ -163,4 +168,6 @@ export interface DedupOutput {
   reasonText?: string;
 }
 
-export type RawTypeHeirarchyItems = vscode.TypeHierarchyItem | vscode.TypeHierarchyItem[];
+export type RawTypeHeirarchyItems =
+  | vscode.TypeHierarchyItem
+  | vscode.TypeHierarchyItem[];

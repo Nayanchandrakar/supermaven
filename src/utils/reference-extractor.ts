@@ -1,14 +1,25 @@
 import type { AstService } from "@/services/ast-service";
-import { NearbyContext } from "@/types";
+import type { NearbyContext } from "@/types";
 import { extractDeclaredNames } from "@/utils/ast-analysis";
-import { findImportLineSpans, parseImportBindings, removeLineSpans } from "@/utils/import-analysis";
+import {
+  findImportLineSpans,
+  parseImportBindings,
+  removeLineSpans,
+} from "@/utils/import-analysis";
 import { extractIdentifiers } from "@/utils/language";
 
 export class ReferenceExtractor {
-  constructor(private readonly astService: AstService) {}
+  private readonly astService: AstService;
+
+  constructor(astService: AstService) {
+    this.astService = astService;
+  }
 
   extract(prefix: string, languageId: string): NearbyContext {
-    const { importedAliasesByOriginal } = parseImportBindings(prefix, languageId);
+    const { importedAliasesByOriginal } = parseImportBindings(
+      prefix,
+      languageId
+    );
     const importSpans = findImportLineSpans(prefix, languageId);
     const prefixWithoutImports = removeLineSpans(prefix, importSpans);
 
@@ -17,22 +28,23 @@ export class ReferenceExtractor {
     const nearbyIdentifiers = extractIdentifiers(nearbyText, languageId);
 
     const declaredIdentifiers =
-      this.astService.withParsedTree(prefix, extractDeclaredNames) ?? new Set<string>();
+      this.astService.withParsedTree(prefix, extractDeclaredNames) ??
+      new Set<string>();
 
-    const referenceNames = this.buildReferenceNames(
+    const referenceNames = ReferenceExtractor.buildReferenceNames(
       nearbyIdentifiers,
       importedAliasesByOriginal,
       declaredIdentifiers
     );
 
     return {
-      referenceNames,
       declaredIdentifiers,
-      nearbyIdentifiers
+      nearbyIdentifiers,
+      referenceNames,
     };
   }
 
-  private buildReferenceNames(
+  private static buildReferenceNames(
     nearbyIdentifiers: Set<string>,
     aliasesByOriginal: Map<string, Set<string>>,
     declaredIdentifiers: Set<string>

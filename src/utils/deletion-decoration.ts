@@ -8,20 +8,17 @@ export class DeletionDecoration implements vscode.Disposable {
   constructor() {
     this.decorationType = vscode.window.createTextEditorDecorationType({
       backgroundColor: "rgba(255, 100, 100, 0.3)",
+      color: "rgba(150,150,150,0.9)",
       textDecoration: "line-through",
-      color: "rgba(150,150,150,0.9)"
     });
 
     this.disposables.push(
       vscode.window.onDidChangeActiveTextEditor(() => {
         this.clearDecorations();
-      })
-    );
-
-    this.disposables.push(
+      }),
       vscode.window.onDidChangeTextEditorSelection((e) => {
         if (this.activeEditor && e.textEditor === this.activeEditor) {
-          const selection = e.selections[0];
+          const [selection] = e.selections;
           if (selection && !selection.isEmpty) {
             this.clearDecorations();
           }
@@ -52,6 +49,8 @@ export class DeletionDecoration implements vscode.Disposable {
   dispose() {
     this.clearDecorations();
     this.decorationType.dispose();
-    this.disposables.forEach((d) => d.dispose());
+    for (const d of this.disposables) {
+      d.dispose();
+    }
   }
 }

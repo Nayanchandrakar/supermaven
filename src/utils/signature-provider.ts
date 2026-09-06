@@ -1,14 +1,17 @@
 import * as vscode from "vscode";
+
 import { BoundedCache } from "@/cache/bounded-cache";
-import { AstService } from "@/services/ast-service";
+import type { AstService } from "@/services/ast-service";
 import type { IndexedSymbol } from "@/types";
 import { extractSignatureFromAST } from "@/utils/ast-analysis";
 import { createCacheKey } from "@/utils/create-cache-key";
 
 export class SignatureProvider {
   private readonly signatureCache: BoundedCache<string>;
+  private readonly astService: AstService;
 
-  constructor(private readonly astService: AstService) {
+  constructor(astService: AstService) {
+    this.astService = astService;
     this.signatureCache = new BoundedCache<string>(1000);
   }
 
@@ -28,7 +31,9 @@ export class SignatureProvider {
     return res;
   }
 
-  private async extractSignature(symbol: IndexedSymbol): Promise<string | undefined> {
+  private async extractSignature(
+    symbol: IndexedSymbol
+  ): Promise<string | undefined> {
     const cacheKey = createCacheKey(
       "signatureProvider",
       symbol.uri,
@@ -64,9 +69,8 @@ export class SignatureProvider {
     if (signature) {
       this.signatureCache.set(cacheKey, signature, { groupKey: symbol.uri });
       return signature;
-    } else {
-      return undefined;
     }
+    return undefined;
   }
 
   clear(): void {
