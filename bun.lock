@@ -3,9 +3,9 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "cursor-tab",
+      "name": "supermaven",
       "dependencies": {
-        "web-tree-sitter": "^0.27.0",
+        "web-tree-sitter": "^0.27.0"
       },
       "devDependencies": {
         "@commitlint/cli": "^21.2.2",

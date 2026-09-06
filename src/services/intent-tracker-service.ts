@@ -330,11 +330,11 @@ export class IntentTrackerService implements vscode.Disposable {
     const entry: IntentEntry = {
       content,
       filePath,
-      type: 'accepted',
+      type: "accepted",
       timestamp: Date.now(),
       id: `intent_${++this.idCounter}`,
-      lineRange: { start: line, end: line },
-    }
+      lineRange: { start: line, end: line }
+    };
 
     this.buffer.push(entry);
 
@@ -343,16 +343,15 @@ export class IntentTrackerService implements vscode.Disposable {
     }
   }
 
-
   recordRejectedSuggestion(filePath: string, line: number, content: string) {
     const entry: IntentEntry = {
       content,
       filePath,
-      type: 'rejected',
+      type: "rejected",
       timestamp: Date.now(),
       id: `intent_${++this.idCounter}`,
-      lineRange: { start: line, end: line },
-    }
+      lineRange: { start: line, end: line }
+    };
 
     this.buffer.push(entry);
 
@@ -362,7 +361,6 @@ export class IntentTrackerService implements vscode.Disposable {
   }
 
   dispose() {
-
     this.finalizeIntent();
     this.disposables.forEach((d) => d.dispose());
     this.clearFlushTimeout();

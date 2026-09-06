@@ -6,7 +6,7 @@ import { ChatMessage, ChatStreamChunk, InferenceProvider } from "@/types";
 export class ApiClient implements vscode.Disposable {
   private pendingRequest: AbortController | null = null;
 
-  constructor(private readonly outputChannel: vscode.OutputChannel) { }
+  constructor(private readonly outputChannel: vscode.OutputChannel) {}
 
   cancelRequest() {
     if (this.pendingRequest) {
@@ -17,9 +17,9 @@ export class ApiClient implements vscode.Disposable {
 
   getActiveProvider(): InferenceProvider | null {
     const config = getConfigService();
-    if (config.openRouterApiKey) return 'openrouter'
-    if (config.groqApiKey) return 'groq';
-    if (config.fireworksApiKey) return 'fireworks';
+    if (config.openRouterApiKey) return "openrouter";
+    if (config.groqApiKey) return "groq";
+    if (config.fireworksApiKey) return "fireworks";
     return null;
   }
 
@@ -48,13 +48,18 @@ export class ApiClient implements vscode.Disposable {
       max_tokens: maxTokens
     };
 
-    if (inferenceProvider === 'groq') {
-      body['reasoning_effort'] = 'none';
+    if (inferenceProvider === "groq") {
+      body["reasoning_effort"] = "none";
     }
 
     this.logger(`[${inferenceProvider}] Request: model=${model}, max_tokens=${maxTokens}`);
 
-    return this.streamRequest(inferenceConfig.url, body, inferenceConfig.getApiKey(), this.pendingRequest.signal);
+    return this.streamRequest(
+      inferenceConfig.url,
+      body,
+      inferenceConfig.getApiKey(),
+      this.pendingRequest.signal
+    );
   }
 
   private async *streamRequest(

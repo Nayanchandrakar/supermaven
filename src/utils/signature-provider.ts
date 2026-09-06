@@ -1,77 +1,75 @@
-import { BoundedCache } from '@/cache/bounded-cache';
-import { AstService } from '@/services/ast-service';
-import type { IndexedSymbol } from '@/types';
-import * as vscode from 'vscode';
-import { createCacheKey } from '@/utils/create-cache-key';
-import { extractSignatureFromAST } from '@/utils/ast-analysis';
+import * as vscode from "vscode";
+import { BoundedCache } from "@/cache/bounded-cache";
+import { AstService } from "@/services/ast-service";
+import type { IndexedSymbol } from "@/types";
+import { extractSignatureFromAST } from "@/utils/ast-analysis";
+import { createCacheKey } from "@/utils/create-cache-key";
 
 export class SignatureProvider {
-    private readonly signatureCache: BoundedCache<string>;
+  private readonly signatureCache: BoundedCache<string>;
 
-    constructor(private readonly astService: AstService) {
-        this.signatureCache = new BoundedCache<string>(1000);
+  constructor(private readonly astService: AstService) {
+    this.signatureCache = new BoundedCache<string>(1000);
+  }
+
+  async extract(symbols: IndexedSymbol[]): Promise<IndexedSymbol[]> {
+    const res: IndexedSymbol[] = [];
+
+    for (const symbol of symbols) {
+      // oxlint-disable-next-line no-await-in-loop
+      const signature = await this.extractSignature(symbol);
+      if (!signature) {
+        continue;
+      }
+
+      res.push({ ...symbol, signature });
     }
 
-    async extract(
-        symbols: IndexedSymbol[]
-    ): Promise<IndexedSymbol[]> {
-        const res: IndexedSymbol[] = []
+    return res;
+  }
 
-        for (const symbol of symbols) {
-            // oxlint-disable-next-line no-await-in-loop
-            const signature = await this.extractSignature(symbol);
-            if (!signature) {
-                continue;
-            }
+  private async extractSignature(symbol: IndexedSymbol): Promise<string | undefined> {
+    const cacheKey = createCacheKey(
+      "signatureProvider",
+      symbol.uri,
+      symbol.kind,
+      symbol.name,
+      symbol.range.startLine,
+      symbol.range.startCharacter,
+      symbol.range.endLine,
+      symbol.range.endCharacter
+    );
 
-            res.push({ ...symbol, signature })
-        }
-
-        return res;
+    const cached = this.signatureCache.get(cacheKey);
+    if (cached !== undefined) {
+      return cached;
     }
 
-    private async extractSignature(
-        symbol: IndexedSymbol
-    ): Promise<string | undefined> {
-        const cacheKey = createCacheKey(
-            'signatureProvider',
-            symbol.uri,
-            symbol.kind,
-            symbol.name,
-            symbol.range.startLine,
-            symbol.range.startCharacter,
-            symbol.range.endLine,
-            symbol.range.endCharacter
-        );
+    const uri = vscode.Uri.parse(symbol.uri);
 
-        const cached = this.signatureCache.get(cacheKey);
-        if (cached !== undefined) {
-            return cached;
-        }
+    const document = await vscode.workspace.openTextDocument(uri);
 
-        const uri = vscode.Uri.parse(symbol.uri);
+    const range = new vscode.Range(
+      symbol.range.startLine,
+      symbol.range.startCharacter,
+      symbol.range.endLine,
+      symbol.range.endCharacter
+    );
+    const fullText = document.getText(range);
 
-        const document = await vscode.workspace.openTextDocument(uri);
+    const signature = this.astService.withParsedTree(fullText, (tree) =>
+      extractSignatureFromAST(tree, symbol.kind)
+    );
 
-        const range = new vscode.Range(
-            symbol.range.startLine,
-            symbol.range.startCharacter,
-            symbol.range.endLine,
-            symbol.range.endCharacter
-        )
-        const fullText = document.getText(range);
-
-        const signature = this.astService.withParsedTree(fullText, (tree) => extractSignatureFromAST(tree, symbol.kind))
-
-        if (signature) {
-            this.signatureCache.set(cacheKey, signature, { groupKey: symbol.uri });
-            return signature;
-        } else {
-            return undefined;
-        }
+    if (signature) {
+      this.signatureCache.set(cacheKey, signature, { groupKey: symbol.uri });
+      return signature;
+    } else {
+      return undefined;
     }
+  }
 
-    clear(): void {
-        this.signatureCache.clear();
-    }
+  clear(): void {
+    this.signatureCache.clear();
+  }
 }

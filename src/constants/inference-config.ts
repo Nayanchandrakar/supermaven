@@ -9,14 +9,14 @@ export const INFERENCE_CONFIG: Record<InferenceProvider, InferenceProviderConfig
   },
   groq: {
     getModelName: () => getConfigService().model,
-    url: "https://api.groq.com/v1/chat/completions",
+    url: "https://api.groq.com/openai/v1/chat/completions",
     getApiKey: () => getConfigService().groqApiKey
   },
   fireworks: {
     getModelName: () => getConfigService().model,
     url: "https://api.fireworks.ai/v2/chat/completions",
     getApiKey: () => getConfigService().fireworksApiKey
-  },
+  }
 };
 
 export const DEFAULT_INFERENCE: CompletionConfig = {

@@ -3,10 +3,10 @@ import * as vscode from "vscode";
 import { CompletionCache } from "@/cache/completion-cache";
 import { ApiClient } from "@/lib/api-client";
 import { ContextGatherer } from "@/lib/context-gatherer";
-import { IntentTrackerService } from "@/services/intent-tracker-service";
-import type { ChatMessage, PendingCompletion, ReplacementEdit } from "@/types";
-import { PromptBuilder } from "@/services/prompt-builder";
 import { DeduplicationService } from "@/services/deduplication-service";
+import { IntentTrackerService } from "@/services/intent-tracker-service";
+import { PromptBuilder } from "@/services/prompt-builder";
+import type { ChatMessage, PendingCompletion, ReplacementEdit } from "@/types";
 import { DeletionDecoration } from "@/utils/deletion-decoration";
 
 export class InlineCompletionItemProvider implements vscode.InlineCompletionItemProvider {
@@ -24,8 +24,7 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     private readonly promptBuilder: PromptBuilder,
     private readonly deduplicationService: DeduplicationService,
     private readonly deletionDecoration: DeletionDecoration
-  ) { }
-
+  ) {}
 
   getPendingEdit(): ReplacementEdit | null {
     return this.pendingCompletion?.edit ?? null;
@@ -59,9 +58,9 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     }
 
     const completionContext = await this.contextGatherer.gatherContext(document, position);
-    const messages = this.promptBuilder.buildPrompt(completionContext)
+    const messages = this.promptBuilder.buildPrompt(completionContext);
 
-    this.logger(`Prefix: ${JSON.stringify(completionContext)}`)
+    this.logger(`Prefix: ${JSON.stringify(completionContext)}`);
 
     if (token.isCancellationRequested) {
       this.logger("Request cancelled");
@@ -75,23 +74,27 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       this.logger(`Api error: ${error}`);
     }
 
-
-    result = this.cleanCompletionText(result)
-    const dedupResult = this.deduplicationService.check(document, position, result)
+    result = this.cleanCompletionText(result);
+    const dedupResult = this.deduplicationService.check(document, position, result);
 
     if (!dedupResult.proceed) {
-      this.logger(`Deduplication rejected: ${dedupResult.reasonText ?? "no reason provider"}`)
+      this.logger(`Deduplication rejected: ${dedupResult.reasonText ?? "no reason provider"}`);
       return null;
     }
 
-    const edit = this.computeMinimalReplacement(document, completionContext.replacementRegion.range.start, completionContext.replacementRegion.range.end, result)
+    const edit = this.computeMinimalReplacement(
+      document,
+      completionContext.replacementRegion.range.start,
+      completionContext.replacementRegion.range.end,
+      result
+    );
 
     if (!edit || edit.insertText.length === 0) {
       this.logger(`No changes detected in the completion`);
       return null;
     }
 
-    this.logger(`Replacement Edit ${JSON.stringify(edit)}`)
+    this.logger(`Replacement Edit ${JSON.stringify(edit)}`);
 
     this.completionCache.set(document, position, editHistoryHash, edit);
     return this.activateCompletion(edit, document);
@@ -168,7 +171,7 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     if (edit.deletedText.length > 0) {
       const editor = vscode.window.activeTextEditor;
       if (editor && editor.document.uri.toString() === document.uri.toString()) {
-        const decorationRange = edit.actualDeleteRange ?? edit.deleteRange
+        const decorationRange = edit.actualDeleteRange ?? edit.deleteRange;
         this.deletionDecoration.showDeletion(editor, decorationRange);
       }
     }
@@ -200,11 +203,10 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     return result;
   }
 
-
   private cleanCompletionText(text: string): string {
-    let cleaned = text.replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
+    let cleaned = text.replace(/^```\w*\n?/, "").replace(/\n?```$/, "");
     const explanationPattern = /\n\n(?:\/\/|\/\*|#|Note:|Explanation:)[\s\S]*$/;
-    cleaned = cleaned.replace(explanationPattern, '');
+    cleaned = cleaned.replace(explanationPattern, "");
     return cleaned.trimEnd();
   }
 
@@ -273,7 +275,9 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       deleteRange: new vscode.Range(regionStart, actualDeleteEnd),
       insertText: newText.slice(0, newDiffEnd),
       deletedText,
-      actualDeleteRange: deletedText ? new vscode.Range(actualDeleteStart, actualDeleteEnd) : undefined,
+      actualDeleteRange: deletedText
+        ? new vscode.Range(actualDeleteStart, actualDeleteEnd)
+        : undefined
     };
   }
 
@@ -286,6 +290,6 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     this.apiClient.dispose();
     this.intentTracker.dispose();
     this.contextGatherer.dispose();
-    this.deletionDecoration.dispose()
+    this.deletionDecoration.dispose();
   }
 }

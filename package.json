@@ -1,9 +1,10 @@
 {
-  "name": "cursor-tab",
-  "displayName": "cursor-tab",
+  "name": "supermaven",
+  "displayName": "supermaven",
   "version": "0.0.1",
   "private": true,
-  "description": "cursor-tab-completion",
+  "publisher": "Nayanchandrakar",
+  "description": "supermaven-completion",
   "categories": [
     "Other"
   ],
@@ -54,57 +55,64 @@
     "*.{js,jsx,ts,tsx,mjs,cjs}": "bun run lint"
   },
   "contributes": {
-    "keybindings":[
+    "keybindings": [
       {
-        "command": "cursor-tab.acceptCompletion",
+        "command": "supermaven.acceptCompletion",
         "key": "tab",
-        "when":"editorTextFocus"
+        "when": "editorTextFocus"
       },
-       {
-        "command": "cursor-tab.rejectCompletion",
+      {
+        "command": "supermaven.rejectCompletion",
         "key": "escape",
-        "when":"editorTextFocus"
+        "when": "editorTextFocus"
       }
     ],
     "configuration": [
       {
-        "title": "Cursor tab completion",
+        "title": "Supermaven tab completion",
         "properties": {
-          "cursor-tab.openrouterApiKey": {
+          "supermaven.openrouterApiKey": {
             "type": "string",
             "default": "",
             "description": "Openrouter Api key"
           },
-          "cursor-tab.groqApiKey": {
+          "supermaven.groqApiKey": {
             "type": "string",
             "default": "",
             "description": "Groq Api key"
           },
-          "cursor-tab.fireworksApiKey": {
+          "supermaven.fireworksApiKey": {
             "type": "string",
             "default": "",
             "description": "Fireworks Api key"
           },
-          "cursor-tab.model": {
+          "supermaven.model": {
             "type": "string",
             "description": "Model to use for tab completion",
-            "default": "stealth/ox-alpha"
+            "default": "qwen/qwen3.8-27b"
           },
-          "cursor-tab.completionCacheMaxEntries": {
+          "supermaven.maxTokens": {
+            "type": "number",
+            "default": 500,
+            "minimum": 50,
+            "maximum": 5000,
+            "description": "Maximum tokens to generate"
+          },
+          "supermaven.completionCacheMaxEntries": {
             "type": "number",
             "default": 100,
             "minimum": 10,
             "maximum": 1000,
             "description": "Maximum entries in completion cache"
           },
-          "cursor-tab.completionCacheTtlMs": {
+          "supermaven.completionCacheTtlMs": {
             "type": "number",
             "default": 30000,
             "minimum": 5000,
             "maximum": 120000,
             "description": "Completion cache in TTL in seconds"
           },
-          "cursor-tab.lspCacheMaxEntries": {
+          "supermaven.lspCacheMaxEntries": {
             "type": "number",
             "default": 100,
             "minimum": 10,

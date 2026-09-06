@@ -42,10 +42,10 @@ export interface ChatMessage {
 }
 
 export interface ReplacementEdit {
-  deleteRange: vscode.Range,
-  insertText: string,
+  deleteRange: vscode.Range;
+  insertText: string;
   deletedText: string;
-  actualDeleteRange: vscode.Range | undefined,
+  actualDeleteRange: vscode.Range | undefined;
 }
 
 export interface PendingCompletion {
@@ -104,7 +104,7 @@ export interface DefinitionTarget {
 
 export interface ReplacementRegion {
   text: string;
-  range: vscode.Range
+  range: vscode.Range;
 }
 
 export interface IndexedSymbol {
@@ -129,13 +129,13 @@ export interface NearbyContext {
 
 export interface CompletionContext {
   prefix: string;
-  replacementRegion: ReplacementRegion
+  replacementRegion: ReplacementRegion;
   suffixAfterRegion: string;
-  cursorPosition: vscode.Position
+  cursorPosition: vscode.Position;
   languageId: string;
   filePath: string;
   editHistory: string;
-  crossFileSymbols: IndexedSymbol[]
+  crossFileSymbols: IndexedSymbol[];
 }
 
 export interface FitToBudgetInput {
