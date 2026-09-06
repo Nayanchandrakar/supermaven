@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-export type InferenceProvider = "openrouter";
+export type InferenceProvider = "openrouter" | "groq" | "fireworks";
 export type Role = "system" | "assistant" | "user";
 export type IntentType = "added" | "pasted" | "edited" | "accepted" | "rejected";
 
@@ -14,7 +14,8 @@ export interface CompletionConfig {
   model: string;
   maxTokens: number;
   openrouterApiKey: string;
-
+  groqApiKey: string;
+  fireworksApiKey: string;
   // Ceche settings
   completionCacheMaxEntries: number;
   completionCacheTtlMs: number;

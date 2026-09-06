@@ -35,6 +35,8 @@ export class ConfigurationService implements vscode.Disposable {
         DEFAULT_INFERENCE.completionCacheMaxEntries
       ),
       openrouterApiKey: config.get<string>("openrouterApiKey", DEFAULT_INFERENCE.openrouterApiKey),
+      groqApiKey: config.get<string>("groqApiKey", DEFAULT_INFERENCE.groqApiKey),
+      fireworksApiKey: config.get<string>("fireworksApiKey", DEFAULT_INFERENCE.fireworksApiKey),
       lspCacheMaxEntries: config.get<number>(
         "lspCacheMaxEntries",
         DEFAULT_INFERENCE.lspCacheMaxEntries
@@ -65,6 +67,14 @@ export class ConfigurationService implements vscode.Disposable {
 
   get openRouterApiKey(): string {
     return this.config.openrouterApiKey;
+  }
+
+  get groqApiKey(): string {
+    return this.config.groqApiKey;
+  }
+
+  get fireworksApiKey(): string {
+    return this.config.fireworksApiKey;
   }
 
   get maxTokens(): number {

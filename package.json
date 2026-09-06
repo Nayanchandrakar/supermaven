@@ -75,6 +75,16 @@
             "default": "",
             "description": "Openrouter Api key"
           },
+          "cursor-tab.groqApiKey": {
+            "type": "string",
+            "default": "",
+            "description": "Groq Api key"
+          },
+          "cursor-tab.fireworksApiKey": {
+            "type": "string",
+            "default": "",
+            "description": "Fireworks Api key"
+          },
           "cursor-tab.model": {
             "type": "string",
             "description": "Model to use for tab completion",

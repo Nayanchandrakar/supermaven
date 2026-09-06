@@ -6,7 +6,7 @@ import { ChatMessage, ChatStreamChunk, InferenceProvider } from "@/types";
 export class ApiClient implements vscode.Disposable {
   private pendingRequest: AbortController | null = null;
 
-  constructor(private readonly outputChannel: vscode.OutputChannel) {}
+  constructor(private readonly outputChannel: vscode.OutputChannel) { }
 
   cancelRequest() {
     if (this.pendingRequest) {
@@ -15,25 +15,29 @@ export class ApiClient implements vscode.Disposable {
     }
   }
 
+  getActiveProvider(): InferenceProvider | null {
+    const config = getConfigService();
+    if (config.openRouterApiKey) return 'openrouter'
+    if (config.groqApiKey) return 'groq';
+    if (config.fireworksApiKey) return 'fireworks';
+    return null;
+  }
+
   async complete(messages: ChatMessage[]): Promise<AsyncGenerator<string, void, unknown>> {
+    const inferenceProvider = this.getActiveProvider();
+
+    if (!inferenceProvider) {
+      throw new Error(`No inference provider configured. please provide an valid api key`);
+    }
+
     this.cancelRequest();
     this.pendingRequest = new AbortController();
 
     const config = getConfigService();
-    let inferenceProvider: InferenceProvider | null = null;
-
-    if (config.openRouterApiKey) {
-      inferenceProvider = "openrouter";
-    }
-
-    if (!inferenceProvider) {
-      throw new Error(`No api key configured. please provide an valid api key`);
-    }
 
     const maxTokens = config.maxTokens;
     const inferenceConfig = INFERENCE_CONFIG[inferenceProvider];
 
-    const apiKey = inferenceConfig.getApiKey();
     const model = inferenceConfig.getModelName();
 
     const body: Record<string, unknown> = {
@@ -44,9 +48,13 @@ export class ApiClient implements vscode.Disposable {
       max_tokens: maxTokens
     };
 
+    if (inferenceProvider === 'groq') {
+      body['reasoning_effort'] = 'none';
+    }
+
     this.logger(`[${inferenceProvider}] Request: model=${model}, max_tokens=${maxTokens}`);
 
-    return this.streamRequest(inferenceConfig.url, body, apiKey, this.pendingRequest.signal);
+    return this.streamRequest(inferenceConfig.url, body, inferenceConfig.getApiKey(), this.pendingRequest.signal);
   }
 
   private async *streamRequest(
