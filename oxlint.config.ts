@@ -1,28 +1,9 @@
 import { defineConfig } from "oxlint";
+import antiSlop from "ultracite/oxlint/anti-slop";
+import core from "ultracite/oxlint/core";
+import vitest from "ultracite/oxlint/vitest";
 
 export default defineConfig({
-  categories: {
-    perf: "warn",
-    suspicious: "warn",
-    correctness: "warn"
-  },
-  options: {
-    typeAware: true,
-    typeCheck: true
-  },
-  plugins: ["unicorn", "typescript", "oxc"],
-  rules: {
-    "no-shadow": "off",
-    "no-alert": "error",
-    "unicorn/no-array-sort": "off",
-    "eslint/prefer-const": "error",
-    "eslint/no-unused-vars": "error",
-    "unicorn/empty-brace-spaces": "off",
-    "typescript/consistent-return": "off",
-    "no-constant-binary-expression": "off",
-    "typescript/no-unsafe-assignment": "warn",
-    "typescript/no-floating-promises": "error",
-    "typescript/no-unsafe-type-assertion": "off",
-    "typescript/restrict-template-expressions": "off"
-  }
+  extends: [core, vitest, antiSlop],
+  ignorePatterns: core.ignorePatterns,
 });

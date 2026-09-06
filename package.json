@@ -3,21 +3,19 @@
   "displayName": "supermaven",
   "version": "0.0.1",
   "private": true,
-  "publisher": "Nayanchandrakar",
   "description": "supermaven-completion",
   "categories": [
     "Other"
   ],
+  "publisher": "Nayanchandrakar",
   "type": "module",
   "main": "./dist/extension.mjs",
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "format": "oxfmt",
-    "format:check": "oxfmt --check",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
     "postinstall": "bun scripts/setup-grammars.ts",
+    "check": "ultracite check",
+    "fix": "ultracite fix",
     "prepare": "husky"
   },
   "dependencies": {
@@ -27,12 +25,12 @@
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
     "@types/emscripten": "^1.41.6",
-    "@types/node": "^26.2.0",
-    "@types/vscode": "^1.125.0",
+    "@types/node": "^26.4.1",
+    "@types/vscode": "^1.136.0",
     "husky": "^9.1.7",
-    "lint-staged": "^17.3.0",
-    "oxfmt": "^0.63.0",
-    "oxlint": "^1.78.0",
+    "lint-staged": "^17.5.0",
+    "oxfmt": "^0.66.0",
+    "oxlint": "^1.81.0",
     "oxlint-tsgolint": "^7.0.2001",
     "tree-sitter-bash": "^0.25.1",
     "tree-sitter-c": "^0.24.1",
@@ -48,11 +46,13 @@
     "tree-sitter-scala": "^0.24.0",
     "tree-sitter-typescript": "^0.23.2",
     "tsdown": "^0.22.14",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "ultracite": "7.11.0"
   },
   "lint-staged": {
-    "*": "oxfmt --no-error-on-unmatched-pattern",
-    "*.{js,jsx,ts,tsx,mjs,cjs}": "bun run lint"
+    "*.{js,jsx,ts,tsx,json,jsonc,css,scss,md,mdx}": [
+      "bun x ultracite fix"
+    ]
   },
   "contributes": {
     "keybindings": [

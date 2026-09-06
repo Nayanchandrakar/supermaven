@@ -1,17 +1,4 @@
 import { defineConfig } from "oxfmt";
+import ultracite from "ultracite/oxfmt";
 
-export default defineConfig({
-  embeddedLanguageFormatting: "auto",
-  endOfLine: "lf",
-  ignorePatterns: ["dist/**"],
-  jsdoc: true,
-  tabWidth: 2,
-  sortImports: {
-    newlinesBetween: false,
-    partitionByNewline: true
-  },
-  sortPackageJson: {
-    sortScripts: true
-  },
-  trailingComma: "none"
-});
+export default defineConfig(ultracite);
