@@ -1,7 +1,393 @@
-import type { LineSpan, ImportBindings } from "@/types";
+import {
+  CLOSE_PAREN_PATTERN,
+  COMMA_PATTERN,
+  GO_QUOTE_PATTERN,
+  JAVA_IMPORT_PATTERN,
+  JS_AS_PATTERN,
+  JS_COLON_ALIAS_PATTERN,
+  JS_TS_DEFAULT_PATTERN,
+  JS_TS_NAMED_PATTERN,
+  JS_TS_NAMESPACE_PATTERN,
+  JS_TS_REQUIRE_DESTRUCTURED_PATTERN,
+  JS_TS_REQUIRE_NAMED_PATTERN,
+  JS_TS_REQUIRE_PATTERN,
+  OPEN_PAREN_PATTERN,
+  PARENS_PATTERN,
+  PYTHON_AS_PATTERN,
+  PYTHON_FROM_AS_PATTERN,
+  PYTHON_FROM_PATTERN,
+  PYTHON_IMPORT_PATTERN,
+  RUST_ALIAS_IMPORT_PATTERN,
+  RUST_ALIAS_PATTERN,
+  RUST_MULTI_PATTERN,
+  RUST_SIMPLE_PATTERN,
+  TRAILING_BACKSLASH_PATTERN,
+  TYPE_PREFIX_PATTERN,
+  WHITESPACE_PATTERN,
+  WORD_PATTERN,
+} from "@/constants/import-patterns";
+import type { ImportBindings, LineSpan } from "@/types";
 import { isJavaScriptOrTypeScript } from "@/utils/language";
 
-export function removeLineSpans(text: string, spans: LineSpan[]): string {
+type RecordBinding = (original: string, local?: string) => void;
+
+const getLine = (lines: string[], index: number): string =>
+  lines.at(index) ?? "";
+
+const getLastSpanEnd = (spans: LineSpan[]): number | undefined =>
+  spans.at(-1)?.end;
+
+const countParenDepth = (line: string): number =>
+  (line.match(OPEN_PAREN_PATTERN) ?? []).length -
+  (line.match(CLOSE_PAREN_PATTERN) ?? []).length;
+
+const isJsTsImportStart = (trimmed: string, line: string): boolean => {
+  if (trimmed.startsWith("import ")) {
+    return true;
+  }
+  if (trimmed.startsWith("export ") && trimmed.includes(" from ")) {
+    return true;
+  }
+  return JS_TS_REQUIRE_PATTERN.test(line);
+};
+
+const findJsTsImportEnd = (
+  lines: string[],
+  startIndex: number,
+  trimmed: string
+): number => {
+  let endIndex = startIndex;
+  if (trimmed.includes("{") && !trimmed.includes("}")) {
+    while (endIndex < lines.length && !getLine(lines, endIndex).includes("}")) {
+      endIndex += 1;
+    }
+    return endIndex;
+  }
+  if (!trimmed.endsWith(";") && !trimmed.includes(" from ")) {
+    while (
+      endIndex < lines.length &&
+      !getLine(lines, endIndex).includes(" from ") &&
+      !getLine(lines, endIndex).trim().endsWith(";")
+    ) {
+      endIndex += 1;
+    }
+  }
+  return endIndex;
+};
+
+const isJsTsNonImportCode = (trimmed: string): boolean => {
+  if (trimmed === "") {
+    return false;
+  }
+  if (trimmed.startsWith("//")) {
+    return false;
+  }
+  if (trimmed.startsWith("/*")) {
+    return false;
+  }
+  if (trimmed.startsWith("*")) {
+    return false;
+  }
+  if (trimmed.startsWith("import")) {
+    return false;
+  }
+  if (trimmed.startsWith("export")) {
+    return false;
+  }
+  return !trimmed.includes("require(");
+};
+
+const findJsTsImportSpans = (lines: string[], spans: LineSpan[]): void => {
+  let i = 0;
+  while (i < lines.length) {
+    const line = getLine(lines, i);
+    const trimmed = line.trim();
+
+    if (isJsTsImportStart(trimmed, line)) {
+      const startLine = i;
+      const endLine = findJsTsImportEnd(lines, i, trimmed);
+      spans.push({ end: endLine, start: startLine });
+      i = endLine + 1;
+      continue;
+    }
+
+    const lastEnd = getLastSpanEnd(spans);
+    if (
+      i > 0 &&
+      lastEnd !== undefined &&
+      isJsTsNonImportCode(trimmed) &&
+      i > lastEnd + 10
+    ) {
+      break;
+    }
+
+    i += 1;
+  }
+};
+
+const isPythonBlankOrComment = (trimmed: string): boolean => {
+  if (trimmed === "") {
+    return true;
+  }
+  if (trimmed.startsWith("#")) {
+    return true;
+  }
+  if (trimmed.startsWith('"""')) {
+    return true;
+  }
+  return trimmed.startsWith("'''");
+};
+
+const findPythonImportEnd = (
+  lines: string[],
+  startIndex: number,
+  trimmed: string
+): number => {
+  let endIndex = startIndex;
+  let parenDepth = countParenDepth(getLine(lines, endIndex));
+  if (parenDepth > 0) {
+    while (endIndex < lines.length && parenDepth > 0) {
+      endIndex += 1;
+      if (endIndex < lines.length) {
+        parenDepth += countParenDepth(getLine(lines, endIndex));
+      }
+    }
+    return endIndex;
+  }
+  if (trimmed.endsWith("\\")) {
+    while (
+      endIndex < lines.length &&
+      getLine(lines, endIndex).trim().endsWith("\\")
+    ) {
+      endIndex += 1;
+    }
+  }
+  return endIndex;
+};
+
+const findPythonImportSpans = (lines: string[], spans: LineSpan[]): void => {
+  let i = 0;
+  while (i < lines.length) {
+    const trimmed = getLine(lines, i).trim();
+
+    if (trimmed.startsWith("import ") || trimmed.startsWith("from ")) {
+      const endLine = findPythonImportEnd(lines, i, trimmed);
+      spans.push({ end: endLine, start: i });
+      i = endLine + 1;
+      continue;
+    }
+
+    const lastEnd = getLastSpanEnd(spans);
+    if (
+      !isPythonBlankOrComment(trimmed) &&
+      lastEnd !== undefined &&
+      i > lastEnd + 5
+    ) {
+      break;
+    }
+
+    i += 1;
+  }
+};
+
+const isRustImportStart = (trimmed: string): boolean => {
+  if (trimmed.startsWith("use ")) {
+    return true;
+  }
+  if (trimmed.startsWith("pub use ")) {
+    return true;
+  }
+  if (trimmed.startsWith("mod ")) {
+    return true;
+  }
+  return trimmed.startsWith("pub mod ");
+};
+
+const isRustBlankOrAnnotation = (trimmed: string): boolean => {
+  if (trimmed === "") {
+    return true;
+  }
+  if (trimmed.startsWith("//")) {
+    return true;
+  }
+  if (trimmed.startsWith("/*")) {
+    return true;
+  }
+  if (trimmed.startsWith("*")) {
+    return true;
+  }
+  return trimmed.startsWith("#[");
+};
+
+const findRustImportSpans = (lines: string[], spans: LineSpan[]): void => {
+  let i = 0;
+  while (i < lines.length) {
+    const trimmed = getLine(lines, i).trim();
+
+    if (isRustImportStart(trimmed)) {
+      const startLine = i;
+      while (i < lines.length && !getLine(lines, i).includes(";")) {
+        i += 1;
+      }
+      spans.push({ end: i, start: startLine });
+      i += 1;
+      continue;
+    }
+
+    const lastEnd = getLastSpanEnd(spans);
+    if (
+      !isRustBlankOrAnnotation(trimmed) &&
+      lastEnd !== undefined &&
+      i > lastEnd + 5
+    ) {
+      break;
+    }
+
+    i += 1;
+  }
+};
+
+const isGoImportBlockStart = (trimmed: string): boolean =>
+  trimmed.includes("(") || trimmed === "import(" || trimmed === "import (";
+
+const isGoBlankOrComment = (trimmed: string): boolean => {
+  if (trimmed === "") {
+    return true;
+  }
+  if (trimmed.startsWith("//")) {
+    return true;
+  }
+  if (trimmed.startsWith("/*")) {
+    return true;
+  }
+  return trimmed.startsWith("*");
+};
+
+const findGoImportSpans = (lines: string[], spans: LineSpan[]): void => {
+  let i = 0;
+  while (i < lines.length) {
+    const trimmed = getLine(lines, i).trim();
+
+    if (
+      trimmed.startsWith("import ") ||
+      trimmed === "import(" ||
+      trimmed === "import ("
+    ) {
+      const startLine = i;
+      if (isGoImportBlockStart(trimmed)) {
+        while (i < lines.length && !getLine(lines, i).trim().startsWith(")")) {
+          i += 1;
+        }
+      }
+      spans.push({ end: i, start: startLine });
+      i += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith("package ")) {
+      spans.push({ end: i, start: i });
+      i += 1;
+      continue;
+    }
+
+    const lastEnd = getLastSpanEnd(spans);
+    if (
+      !isGoBlankOrComment(trimmed) &&
+      lastEnd !== undefined &&
+      i > lastEnd + 5
+    ) {
+      break;
+    }
+
+    i += 1;
+  }
+};
+
+const isJavaBlankOrAnnotation = (trimmed: string): boolean => {
+  if (trimmed === "") {
+    return true;
+  }
+  if (trimmed.startsWith("//")) {
+    return true;
+  }
+  if (trimmed.startsWith("/*")) {
+    return true;
+  }
+  if (trimmed.startsWith("*")) {
+    return true;
+  }
+  return trimmed.startsWith("@");
+};
+
+const findJavaImportSpans = (lines: string[], spans: LineSpan[]): void => {
+  let i = 0;
+  while (i < lines.length) {
+    const trimmed = getLine(lines, i).trim();
+
+    if (trimmed.startsWith("import ") || trimmed.startsWith("package ")) {
+      spans.push({ end: i, start: i });
+      i += 1;
+      continue;
+    }
+
+    if (!isJavaBlankOrAnnotation(trimmed) && spans.length > 0) {
+      break;
+    }
+
+    i += 1;
+  }
+};
+
+const isCBlankOrComment = (trimmed: string): boolean => {
+  if (trimmed === "") {
+    return true;
+  }
+  if (trimmed.startsWith("//")) {
+    return true;
+  }
+  if (trimmed.startsWith("/*")) {
+    return true;
+  }
+  return trimmed.startsWith("*");
+};
+
+const isCGuardDirective = (trimmed: string): boolean => {
+  if (trimmed.startsWith("#pragma")) {
+    return true;
+  }
+  if (trimmed.startsWith("#ifndef")) {
+    return true;
+  }
+  if (trimmed.startsWith("#define")) {
+    return true;
+  }
+  return trimmed.startsWith("#endif");
+};
+
+const findCIncludeSpans = (lines: string[], spans: LineSpan[]): void => {
+  for (let i = 0; i < lines.length; i += 1) {
+    const trimmed = getLine(lines, i).trim();
+
+    if (trimmed.startsWith("#include")) {
+      let endLine = i;
+      while (
+        endLine < lines.length &&
+        getLine(lines, endLine).trimEnd().endsWith("\\")
+      ) {
+        endLine += 1;
+      }
+      spans.push({ end: endLine, start: i });
+    } else if (
+      !isCGuardDirective(trimmed) &&
+      !isCBlankOrComment(trimmed) &&
+      spans.length > 0
+    ) {
+      break;
+    }
+  }
+};
+
+export const removeLineSpans = (text: string, spans: LineSpan[]): string => {
   if (spans.length === 0) {
     return text;
   }
@@ -10,22 +396,28 @@ export function removeLineSpans(text: string, spans: LineSpan[]): string {
   const toRemove = new Set<number>();
 
   for (const span of spans) {
-    for (let i = span.start; i <= span.end && i < lines.length; i++) {
+    for (let i = span.start; i <= span.end && i < lines.length; i += 1) {
       toRemove.add(i);
     }
   }
 
   const kept: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = 0; i < lines.length; i += 1) {
     if (!toRemove.has(i)) {
-      kept.push(lines[i]!);
+      const line = lines.at(i);
+      if (line !== undefined) {
+        kept.push(line);
+      }
     }
   }
 
   return kept.join("\n");
-}
+};
 
-export function findImportLineSpans(text: string, languageId: string): LineSpan[] {
+export const findImportLineSpans = (
+  text: string,
+  languageId: string
+): LineSpan[] => {
   const lines = text.split("\n");
   const spans: LineSpan[] = [];
 
@@ -44,276 +436,352 @@ export function findImportLineSpans(text: string, languageId: string): LineSpan[
   }
 
   return spans;
+};
+
+const recordJsTsNamedList = (
+  rawNames: string,
+  record: RecordBinding,
+  separator: RegExp,
+  aliasPattern: RegExp,
+  stripTypePrefix: boolean
+): void => {
+  const names = rawNames.split(separator);
+  for (const name of names) {
+    const asMatch = aliasPattern.exec(name);
+    const original = asMatch?.groups?.["original"];
+    const alias = asMatch?.groups?.["alias"];
+    if (original && alias) {
+      record(original, alias);
+      continue;
+    }
+    const trimmedName = name.trim();
+    const cleanName = stripTypePrefix
+      ? trimmedName.replace(TYPE_PREFIX_PATTERN, "")
+      : trimmedName;
+    if (cleanName && WORD_PATTERN.test(cleanName)) {
+      record(cleanName, cleanName);
+    }
+  }
+};
+
+const parseJsTsImports = (text: string, record: RecordBinding): void => {
+  let match: RegExpExecArray | null;
+
+  JS_TS_DEFAULT_PATTERN.lastIndex = 0;
+  while ((match = JS_TS_DEFAULT_PATTERN.exec(text)) !== null) {
+    const defaultName = match.groups?.["defaultName"];
+    if (defaultName) {
+      record(defaultName, defaultName);
+    }
+  }
+
+  JS_TS_NAMED_PATTERN.lastIndex = 0;
+  while ((match = JS_TS_NAMED_PATTERN.exec(text)) !== null) {
+    const names = match.groups?.["names"];
+    if (names) {
+      recordJsTsNamedList(names, record, COMMA_PATTERN, JS_AS_PATTERN, true);
+    }
+  }
+
+  JS_TS_NAMESPACE_PATTERN.lastIndex = 0;
+  while ((match = JS_TS_NAMESPACE_PATTERN.exec(text)) !== null) {
+    const namespace = match.groups?.["namespace"];
+    if (namespace) {
+      record(namespace, namespace);
+    }
+  }
+
+  JS_TS_REQUIRE_NAMED_PATTERN.lastIndex = 0;
+  while ((match = JS_TS_REQUIRE_NAMED_PATTERN.exec(text)) !== null) {
+    const name = match.groups?.["name"];
+    if (name) {
+      record(name, name);
+    }
+  }
+
+  JS_TS_REQUIRE_DESTRUCTURED_PATTERN.lastIndex = 0;
+  while ((match = JS_TS_REQUIRE_DESTRUCTURED_PATTERN.exec(text)) !== null) {
+    const names = match.groups?.["names"];
+    if (names) {
+      recordJsTsNamedList(
+        names,
+        record,
+        COMMA_PATTERN,
+        JS_COLON_ALIAS_PATTERN,
+        false
+      );
+    }
+  }
+};
+
+interface CollectedPythonImport {
+  importPart: string;
+  nextIndex: number;
 }
 
-function findJsTsImportSpans(lines: string[], spans: LineSpan[]): void {
+const collectPythonFromImportPart = (
+  lines: string[],
+  startIndex: number,
+  initialPart: string
+): CollectedPythonImport => {
+  let importPart = initialPart;
+  let index = startIndex;
+  if (importPart.includes("(") && !importPart.includes(")")) {
+    index += 1;
+    while (index < lines.length && !getLine(lines, index).includes(")")) {
+      importPart = `${importPart} ${getLine(lines, index).trim()}`;
+      index += 1;
+    }
+    if (index < lines.length) {
+      importPart = `${importPart} ${getLine(lines, index).trim()}`;
+    }
+    return { importPart, nextIndex: index };
+  }
+  if (importPart.endsWith("\\")) {
+    while (
+      index < lines.length &&
+      getLine(lines, index).trim().endsWith("\\")
+    ) {
+      index += 1;
+      if (index < lines.length) {
+        const continuation = getLine(lines, index)
+          .trim()
+          .replace(TRAILING_BACKSLASH_PATTERN, "");
+        importPart = `${importPart} ${continuation}`;
+      }
+    }
+  }
+  return { importPart, nextIndex: index };
+};
+
+const recordPythonFromNames = (
+  importPart: string,
+  record: RecordBinding
+): void => {
+  const cleaned = importPart.replaceAll(PARENS_PATTERN, "");
+  const names = cleaned.split(",");
+  for (const name of names) {
+    const asMatch = PYTHON_FROM_AS_PATTERN.exec(name);
+    const original = asMatch?.groups?.["original"];
+    const alias = asMatch?.groups?.["alias"];
+    if (original && alias) {
+      record(original, alias);
+      continue;
+    }
+    const cleanName = name.trim();
+    if (cleanName && cleanName !== "*" && WORD_PATTERN.test(cleanName)) {
+      record(cleanName, cleanName);
+    }
+  }
+};
+
+const recordPythonImportModules = (
+  modulesPart: string,
+  record: RecordBinding
+): void => {
+  const modules = modulesPart.split(",");
+  for (const module of modules) {
+    const asMatch = PYTHON_AS_PATTERN.exec(module);
+    const original = asMatch?.groups?.["original"];
+    const alias = asMatch?.groups?.["alias"];
+    if (original && alias) {
+      const [moduleName] = original.split(".");
+      if (moduleName) {
+        record(moduleName, alias);
+      }
+      continue;
+    }
+    const [moduleName] = module.trim().split(".");
+    if (moduleName && WORD_PATTERN.test(moduleName)) {
+      record(moduleName, moduleName);
+    }
+  }
+};
+
+const parsePythonImports = (text: string, record: RecordBinding): void => {
+  const lines = text.split("\n");
   let i = 0;
+
   while (i < lines.length) {
-    const trimmed = lines[i]!.trim();
+    const trimmed = getLine(lines, i).trim();
 
-    // Check for import statement
-    if (
-      trimmed.startsWith("import ") ||
-      (trimmed.startsWith("export ") && trimmed.includes(" from ")) ||
-      /^\s*(const|let|var)\s+\w+\s*=\s*require\s*\(/.test(lines[i]!)
-    ) {
-      const startLine = i;
-
-      // Check if it's a multi-line import (has { but no })
-      if (trimmed.includes("{") && !trimmed.includes("}")) {
-        // Find closing brace
-        while (i < lines.length && !lines[i]!.includes("}")) {
-          i++;
-        }
-      }
-      // Check if it spans multiple lines (no semicolon or 'from' yet)
-      else if (!trimmed.endsWith(";") && !trimmed.includes(" from ")) {
-        // Continue until we find 'from' or semicolon
-        while (
-          i < lines.length &&
-          !lines[i]!.includes(" from ") &&
-          !lines[i]!.trim().endsWith(";")
-        ) {
-          i++;
-        }
-      }
-
-      spans.push({ start: startLine, end: i });
-      i++;
+    const fromMatch = PYTHON_FROM_PATTERN.exec(trimmed);
+    const importPart = fromMatch?.groups?.["importPart"];
+    if (fromMatch && importPart !== undefined) {
+      const collected = collectPythonFromImportPart(lines, i, importPart);
+      recordPythonFromNames(collected.importPart, record);
+      i = collected.nextIndex + 1;
       continue;
     }
 
-    // Skip past import region (usually at top of file)
-    if (
-      i > 0 &&
-      spans.length > 0 &&
-      trimmed !== "" &&
-      !trimmed.startsWith("//") &&
-      !trimmed.startsWith("/*") &&
-      !trimmed.startsWith("*") &&
-      !trimmed.startsWith("import") &&
-      !trimmed.startsWith("export") &&
-      !trimmed.includes("require(")
-    ) {
-      // Check if we're still in the import region (allow blank/comment lines)
-      if (i > spans[spans.length - 1]!.end + 10) {
-        break;
-      }
+    const importMatch = PYTHON_IMPORT_PATTERN.exec(trimmed);
+    const modulesPart = importMatch?.groups?.["modules"];
+    if (importMatch && modulesPart !== undefined) {
+      recordPythonImportModules(modulesPart, record);
     }
 
-    i++;
+    i += 1;
   }
-}
+};
 
-function findPythonImportSpans(lines: string[], spans: LineSpan[]): void {
-  let i = 0;
-  while (i < lines.length) {
-    const trimmed = lines[i]!.trim();
+const recordRustMultiItems = (items: string, record: RecordBinding): void => {
+  const splitItems = items.split(COMMA_PATTERN);
+  for (const item of splitItems) {
+    const trimmed = item.trim();
+    if (!trimmed || trimmed === "self" || trimmed === "super") {
+      continue;
+    }
+    const asMatch = RUST_ALIAS_PATTERN.exec(trimmed);
+    const original = asMatch?.groups?.["original"];
+    const alias = asMatch?.groups?.["alias"];
+    if (original && alias) {
+      record(original, alias);
+    } else if (WORD_PATTERN.test(trimmed)) {
+      record(trimmed, trimmed);
+    }
+  }
+};
 
-    if (trimmed.startsWith("import ") || trimmed.startsWith("from ")) {
-      const startLine = i;
-      let parenDepth =
-        (lines[i]!.match(/\(/g) || []).length - (lines[i]!.match(/\)/g) || []).length;
+const recordRustSimpleMatch = (
+  match: RegExpExecArray,
+  record: RecordBinding
+): void => {
+  const [full] = match;
+  if (full?.includes(" as ")) {
+    return;
+  }
+  const name = match.groups?.["name"];
+  if (name) {
+    record(name, name);
+  }
+};
 
-      // Multi-line with parentheses
-      if (parenDepth > 0) {
-        while (i < lines.length && parenDepth > 0) {
-          i++;
-          if (i < lines.length) {
-            parenDepth += (lines[i]!.match(/\(/g) || []).length;
-            parenDepth -= (lines[i]!.match(/\)/g) || []).length;
-          }
-        }
-      }
-      // Multi-line with backslash continuation
-      else if (trimmed.endsWith("\\")) {
-        while (i < lines.length && lines[i]!.trim().endsWith("\\")) {
-          i++;
-        }
-      }
+const recordRustAliasMatch = (
+  match: RegExpExecArray,
+  record: RecordBinding
+): void => {
+  const original = match.groups?.["original"];
+  const alias = match.groups?.["alias"];
+  if (original && alias) {
+    record(original, alias);
+  }
+};
 
-      spans.push({ start: startLine, end: i });
-      i++;
+const parseRustImports = (text: string, record: RecordBinding): void => {
+  let match: RegExpExecArray | null;
+
+  RUST_SIMPLE_PATTERN.lastIndex = 0;
+  while ((match = RUST_SIMPLE_PATTERN.exec(text)) !== null) {
+    recordRustSimpleMatch(match, record);
+  }
+
+  RUST_ALIAS_IMPORT_PATTERN.lastIndex = 0;
+  while ((match = RUST_ALIAS_IMPORT_PATTERN.exec(text)) !== null) {
+    recordRustAliasMatch(match, record);
+  }
+
+  RUST_MULTI_PATTERN.lastIndex = 0;
+  while ((match = RUST_MULTI_PATTERN.exec(text)) !== null) {
+    const items = match.groups?.["items"];
+    if (items) {
+      recordRustMultiItems(items, record);
+    }
+  }
+};
+
+const parseGoImportLine = (line: string, record: RecordBinding): void => {
+  const clean = line.replaceAll(GO_QUOTE_PATTERN, "").trim();
+  if (!clean) {
+    return;
+  }
+
+  const parts = clean.split(WHITESPACE_PATTERN);
+  const [first, second] = parts;
+  if (parts.length === 1 && first) {
+    const pathParts = first.split("/");
+    const pkgName = pathParts.at(-1);
+    if (pkgName && pkgName !== "." && pkgName !== "_") {
+      record(pkgName, pkgName);
+    }
+    return;
+  }
+  if (parts.length >= 2 && first && second) {
+    const pathParts = second.split("/");
+    const pkgName = pathParts.at(-1);
+    if (first !== "." && first !== "_") {
+      record(pkgName || first, first);
+    }
+  }
+};
+
+const parseGoImports = (text: string, record: RecordBinding): void => {
+  const lines = text.split("\n");
+  let inBlock = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (
+      trimmed === "import (" ||
+      trimmed === "import(" ||
+      trimmed.startsWith("import (")
+    ) {
+      inBlock = true;
       continue;
     }
 
-    // Stop at non-import code (but allow blank lines and comments)
-    if (
-      trimmed !== "" &&
-      !trimmed.startsWith("#") &&
-      !trimmed.startsWith('"""') &&
-      !trimmed.startsWith("'''")
-    ) {
-      if (spans.length > 0 && i > spans[spans.length - 1]!.end + 5) {
-        break;
+    if (inBlock) {
+      if (trimmed.startsWith(")")) {
+        inBlock = false;
+        continue;
       }
-    }
-
-    i++;
-  }
-}
-
-function findRustImportSpans(lines: string[], spans: LineSpan[]): void {
-  let i = 0;
-  while (i < lines.length) {
-    const trimmed = lines[i]!.trim();
-
-    if (
-      trimmed.startsWith("use ") ||
-      trimmed.startsWith("pub use ") ||
-      trimmed.startsWith("mod ") ||
-      trimmed.startsWith("pub mod ")
-    ) {
-      const startLine = i;
-
-      // Find end of statement (semicolon)
-      while (i < lines.length && !lines[i]!.includes(";")) {
-        i++;
-      }
-
-      spans.push({ start: startLine, end: i });
-      i++;
+      parseGoImportLine(trimmed, record);
       continue;
     }
 
-    // Stop at non-import code
-    if (
-      trimmed !== "" &&
-      !trimmed.startsWith("//") &&
-      !trimmed.startsWith("/*") &&
-      !trimmed.startsWith("*") &&
-      !trimmed.startsWith("#[")
-    ) {
-      if (spans.length > 0 && i > spans[spans.length - 1]!.end + 5) {
-        break;
-      }
+    if (trimmed.startsWith("import ")) {
+      const rest = trimmed.slice(7).trim();
+      parseGoImportLine(rest, record);
     }
-
-    i++;
   }
-}
+};
 
-function findGoImportSpans(lines: string[], spans: LineSpan[]): void {
-  let i = 0;
-  while (i < lines.length) {
-    const trimmed = lines[i]!.trim();
-
-    if (trimmed.startsWith("import ") || trimmed === "import(" || trimmed === "import (") {
-      const startLine = i;
-
-      // Check for multi-line import block
-      if (trimmed.includes("(") || trimmed === "import(" || trimmed === "import (") {
-        // Find closing paren
-        while (i < lines.length && !lines[i]!.trim().startsWith(")")) {
-          i++;
-        }
-      }
-
-      spans.push({ start: startLine, end: i });
-      i++;
+const parseJavaImports = (text: string, record: RecordBinding): void => {
+  JAVA_IMPORT_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = JAVA_IMPORT_PATTERN.exec(text)) !== null) {
+    const path = match.groups?.["path"];
+    if (!path || path.endsWith(".*")) {
       continue;
     }
-
-    // Also capture package declaration
-    if (trimmed.startsWith("package ")) {
-      spans.push({ start: i, end: i });
-      i++;
-      continue;
-    }
-
-    // Stop at non-import code
-    if (
-      trimmed !== "" &&
-      !trimmed.startsWith("//") &&
-      !trimmed.startsWith("/*") &&
-      !trimmed.startsWith("*")
-    ) {
-      if (spans.length > 0 && i > spans[spans.length - 1]!.end + 5) {
-        break;
-      }
-    }
-
-    i++;
-  }
-}
-
-function findJavaImportSpans(lines: string[], spans: LineSpan[]): void {
-  let i = 0;
-  while (i < lines.length) {
-    const trimmed = lines[i]!.trim();
-
-    if (trimmed.startsWith("import ") || trimmed.startsWith("package ")) {
-      // Java imports are single-line
-      spans.push({ start: i, end: i });
-      i++;
-      continue;
-    }
-
-    // Stop at non-import code (class/interface/etc)
-    if (
-      trimmed !== "" &&
-      !trimmed.startsWith("//") &&
-      !trimmed.startsWith("/*") &&
-      !trimmed.startsWith("*") &&
-      !trimmed.startsWith("@")
-    ) {
-      if (spans.length > 0) {
-        break;
-      }
-    }
-
-    i++;
-  }
-}
-
-function findCIncludeSpans(lines: string[], spans: LineSpan[]): void {
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i]!.trim();
-
-    if (trimmed.startsWith("#include")) {
-      // Check for line continuation
-      let endLine = i;
-      while (endLine < lines.length && lines[endLine]!.trimEnd().endsWith("\\")) {
-        endLine++;
-      }
-      spans.push({ start: i, end: endLine });
-    }
-    // Also handle #pragma once, #ifndef guards, etc.
-    else if (
-      trimmed.startsWith("#pragma") ||
-      trimmed.startsWith("#ifndef") ||
-      trimmed.startsWith("#define") ||
-      trimmed.startsWith("#endif")
-    ) {
-      // Skip these but don't treat as end of import region
-    }
-    // Stop at actual code
-    else if (
-      trimmed !== "" &&
-      !trimmed.startsWith("//") &&
-      !trimmed.startsWith("/*") &&
-      !trimmed.startsWith("*")
-    ) {
-      if (spans.length > 0) {
-        break;
-      }
+    const parts = path.split(".");
+    const className = parts.at(-1);
+    if (className) {
+      record(className, className);
     }
   }
-}
+};
 
-export function parseImportBindings(text: string, languageId: string): ImportBindings {
+export const parseImportBindings = (
+  text: string,
+  languageId: string
+): ImportBindings => {
   const importedOriginalNames = new Set<string>();
   const importedAliasesByOriginal = new Map<string, Set<string>>();
   const importedLocalNames = new Set<string>();
 
-  const recordBinding = (original: string, local?: string): void => {
+  const recordBinding: RecordBinding = (original: string, local?: string) => {
     const orig = original.trim();
-    if (!orig) return;
+    if (!orig) {
+      return;
+    }
 
     importedOriginalNames.add(orig);
 
     const localName = (local ?? original).trim();
-    if (!localName) return;
+    if (!localName) {
+      return;
+    }
 
     let aliases = importedAliasesByOriginal.get(orig);
     if (!aliases) {
@@ -335,241 +803,15 @@ export function parseImportBindings(text: string, languageId: string): ImportBin
   } else if (languageId === "java") {
     parseJavaImports(text, recordBinding);
   }
-  // C/C++ includes don't really have bindings
 
-  return { importedOriginalNames, importedAliasesByOriginal, importedLocalNames };
-}
+  return {
+    importedAliasesByOriginal,
+    importedLocalNames,
+    importedOriginalNames,
+  };
+};
 
-function parseJsTsImports(text: string, record: (orig: string, local?: string) => void): void {
-  // Default imports: import Foo from 'module'
-  const defaultPattern = /import\s+(?:type\s+)?(\w+)\s+from\s+['"][^'"]+['"]/g;
-  let match;
-  while ((match = defaultPattern.exec(text)) !== null) {
-    record(match[1]!, match[1]);
-  }
-
-  // Named imports: import { Foo, Bar as Baz } from 'module'
-  const namedPattern = /import\s*(?:type\s*)?\{([^}]+)\}\s*from\s*['"][^'"]+['"]/g;
-  while ((match = namedPattern.exec(text)) !== null) {
-    const names = match[1]!.split(",");
-    for (const name of names) {
-      const asMatch = name.match(/(\w+)\s+as\s+(\w+)/);
-      if (asMatch) {
-        record(asMatch[1]!, asMatch[2]);
-      } else {
-        const cleanName = name.trim().replace(/^type\s+/, "");
-        if (cleanName && /^\w+$/.test(cleanName)) {
-          record(cleanName, cleanName);
-        }
-      }
-    }
-  }
-
-  // Namespace imports: import * as Foo from 'module'
-  const nsPattern = /import\s+\*\s+as\s+(\w+)\s+from\s+['"][^'"]+['"]/g;
-  while ((match = nsPattern.exec(text)) !== null) {
-    record(match[1]!, match[1]);
-  }
-
-  // require: const Foo = require('module')
-  const requirePattern = /(?:const|let|var)\s+(\w+)\s*=\s*require\s*\(\s*['"][^'"]+['"]\s*\)/g;
-  while ((match = requirePattern.exec(text)) !== null) {
-    record(match[1]!, match[1]);
-  }
-
-  // Destructured require: const { Foo, Bar } = require('module')
-  const destructuredRequirePattern =
-    /(?:const|let|var)\s+\{([^}]+)\}\s*=\s*require\s*\(\s*['"][^'"]+['"]\s*\)/g;
-  while ((match = destructuredRequirePattern.exec(text)) !== null) {
-    const names = match[1]!.split(",");
-    for (const name of names) {
-      const asMatch = name.match(/(\w+)\s*:\s*(\w+)/);
-      if (asMatch) {
-        record(asMatch[1]!, asMatch[2]);
-      } else {
-        const cleanName = name.trim();
-        if (cleanName && /^\w+$/.test(cleanName)) {
-          record(cleanName, cleanName);
-        }
-      }
-    }
-  }
-}
-
-function parsePythonImports(text: string, record: (orig: string, local?: string) => void): void {
-  const lines = text.split("\n");
-  let i = 0;
-
-  while (i < lines.length) {
-    const trimmed = lines[i]!.trim();
-
-    // from module import names
-    const fromMatch = trimmed.match(/^from\s+(\S+)\s+import\s+(.+)$/);
-    if (fromMatch) {
-      let importPart = fromMatch[2]!;
-
-      // Handle multi-line imports
-      if (importPart.includes("(") && !importPart.includes(")")) {
-        i++;
-        while (i < lines.length && !lines[i]!.includes(")")) {
-          importPart += " " + lines[i]!.trim();
-          i++;
-        }
-        if (i < lines.length) {
-          importPart += " " + lines[i]!.trim();
-        }
-      } else if (importPart.endsWith("\\")) {
-        while (i < lines.length && lines[i]!.trim().endsWith("\\")) {
-          i++;
-          if (i < lines.length) {
-            importPart += " " + lines[i]!.trim().replace(/\\$/, "");
-          }
-        }
-      }
-
-      // Parse the names
-      importPart = importPart.replace(/[()]/g, "");
-      const names = importPart.split(",");
-      for (const name of names) {
-        const asMatch = name.match(/(\w+)\s+as\s+(\w+)/);
-        if (asMatch) {
-          record(asMatch[1]!, asMatch[2]);
-        } else {
-          const cleanName = name.trim();
-          if (cleanName && cleanName !== "*" && /^\w+$/.test(cleanName)) {
-            record(cleanName, cleanName);
-          }
-        }
-      }
-      i++;
-      continue;
-    }
-
-    // import module [as alias]
-    const importMatch = trimmed.match(/^import\s+(.+)$/);
-    if (importMatch) {
-      const modules = importMatch[1]!.split(",");
-      for (const module of modules) {
-        const asMatch = module.match(/([\w.]+)\s+as\s+(\w+)/);
-        if (asMatch) {
-          const moduleName = asMatch[1]!.split(".")[0]!;
-          record(moduleName, asMatch[2]);
-        } else {
-          const moduleName = module.trim().split(".")[0];
-          if (moduleName && /^\w+$/.test(moduleName)) {
-            record(moduleName, moduleName);
-          }
-        }
-      }
-    }
-
-    i++;
-  }
-}
-
-function parseRustImports(text: string, record: (orig: string, local?: string) => void): void {
-  // use path::Name;
-  const simplePattern = /^\s*(?:pub\s+)?use\s+(?:[\w:]+::)?(\w+)\s*;/gm;
-  let match;
-  while ((match = simplePattern.exec(text)) !== null) {
-    record(match[1]!, match[1]);
-  }
-
-  // use path::Name as Alias;
-  const aliasPattern = /^\s*(?:pub\s+)?use\s+(?:[\w:]+::)?(\w+)\s+as\s+(\w+)\s*;/gm;
-  while ((match = aliasPattern.exec(text)) !== null) {
-    record(match[1]!, match[2]);
-  }
-
-  // use path::{Name1, Name2 as Alias};
-  const multiPattern = /^\s*(?:pub\s+)?use\s+[\w:]+::\{([^}]+)\}\s*;/gm;
-  while ((match = multiPattern.exec(text)) !== null) {
-    const items = match[1]!.split(",");
-    for (const item of items) {
-      const trimmed = item.trim();
-      if (!trimmed || trimmed === "self" || trimmed === "super") continue;
-
-      const asMatch = trimmed.match(/^(\w+)\s+as\s+(\w+)$/);
-      if (asMatch) {
-        record(asMatch[1]!, asMatch[2]);
-      } else if (/^\w+$/.test(trimmed)) {
-        record(trimmed, trimmed);
-      }
-    }
-  }
-}
-
-function parseGoImports(text: string, record: (orig: string, local?: string) => void): void {
-  const lines = text.split("\n");
-  let inBlock = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (trimmed === "import (" || trimmed === "import(" || trimmed.startsWith("import (")) {
-      inBlock = true;
-      continue;
-    }
-
-    if (inBlock) {
-      if (trimmed.startsWith(")")) {
-        inBlock = false;
-        continue;
-      }
-      parseGoImportLine(trimmed, record);
-      continue;
-    }
-
-    if (trimmed.startsWith("import ")) {
-      const rest = trimmed.slice(7).trim();
-      parseGoImportLine(rest, record);
-    }
-  }
-}
-
-function parseGoImportLine(line: string, record: (orig: string, local?: string) => void): void {
-  // Remove quotes
-  const clean = line.replace(/"/g, "").trim();
-  if (!clean) return;
-
-  const parts = clean.split(/\s+/);
-  if (parts.length === 1) {
-    // import "path/pkg"
-    const pathParts = parts[0]!.split("/");
-    const pkgName = pathParts[pathParts.length - 1];
-    if (pkgName && pkgName !== "." && pkgName !== "_") {
-      record(pkgName, pkgName);
-    }
-  } else if (parts.length >= 2) {
-    // import alias "path/pkg"
-    const alias = parts[0];
-    const pathParts = parts[1]!.split("/");
-    const pkgName = pathParts[pathParts.length - 1];
-    if (alias && alias !== "." && alias !== "_") {
-      record(pkgName || alias, alias);
-    }
-  }
-}
-
-function parseJavaImports(text: string, record: (orig: string, local?: string) => void): void {
-  // import pkg.Class;
-  const pattern = /^\s*import\s+([\w.]+)\s*;/gm;
-  let match;
-  while ((match = pattern.exec(text)) !== null) {
-    const path = match[1]!;
-    if (path.endsWith(".*")) {
-      // Wildcard import - can't determine specific names
-      continue;
-    }
-    const parts = path.split(".");
-    const className = parts[parts.length - 1];
-    if (className) {
-      record(className, className);
-    }
-  }
-}
-
-export function getLastNLines(text: string, n: number): string {
+export const getLastNLines = (text: string, n: number): string => {
   const lines = text.split("\n");
   return lines.slice(-n).join("\n");
-}
+};

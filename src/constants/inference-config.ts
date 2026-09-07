@@ -18,6 +18,6 @@ export const INFERENCE_CONFIG: Record<
   openrouter: {
     getApiKey: () => getConfigService().openRouterApiKey,
     getModelName: () => getConfigService().model,
-    url: "https://openrouter.ai/api/v1/chat/completions",
+    url: "https://api.fireworks.ai/inference/v1/chat/completions",
   },
 };

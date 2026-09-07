@@ -1,33 +1,52 @@
 import * as vscode from "vscode";
 
-import { LocaleDependencyResolver } from "@/lib/local-dependency-resolver";
-import { LSPService } from "@/services/lsp-service";
-import { EnclosingScopes } from "@/types";
-import { findImportLineSpans, parseImportBindings } from "@/utils/import-analysis";
+import type { LocaleDependencyResolver } from "@/lib/local-dependency-resolver";
+import type { LSPService } from "@/services/lsp-service";
+import type { EnclosingScopes } from "@/types";
+import {
+  findImportLineSpans,
+  parseImportBindings,
+} from "@/utils/import-analysis";
 import { extractIdentifiers, getTruncationMarker } from "@/utils/language";
 
 export class PrefixStage {
-  constructor(
-    private readonly lspService: LSPService,
-    private readonly outputChannel: vscode.OutputChannel,
-    private readonly localDependencyResolve: LocaleDependencyResolver
-  ) {}
+  private readonly lspService: LSPService;
+  private readonly outputChannel: vscode.OutputChannel;
+  private readonly localDependencyResolve: LocaleDependencyResolver;
 
-  async buildPrefix(document: vscode.TextDocument, position: vscode.Position): Promise<string> {
+  constructor(
+    lspService: LSPService,
+    outputChannel: vscode.OutputChannel,
+    localDependencyResolve: LocaleDependencyResolver
+  ) {
+    this.lspService = lspService;
+    this.outputChannel = outputChannel;
+    this.localDependencyResolve = localDependencyResolve;
+  }
+
+  async buildPrefix(
+    document: vscode.TextDocument,
+    position: vscode.Position
+  ): Promise<string> {
     if (position.line < 150) {
-      return this.getVerbatimPrefix(document, position);
+      return PrefixStage.getVerbatimPrefix(document, position);
     }
 
     const scopes = await this.getEnclosingScopes(document, position);
 
     if (!scopes.enclosingFunction) {
-      return this.buildSimplifiedPrefix(document, position, 150);
+      return PrefixStage.buildSimplifiedPrefix(document, position, 150);
     }
 
     const functionStartLine = scopes.enclosingFunction.range.start.line;
     const linesFromFunctionStart = position.line - functionStartLine >= 150;
 
-    return this.buildScopedPrefix(document, position, scopes, linesFromFunctionStart);
+    return this.buildScopedPrefix(
+      document,
+      position,
+      scopes,
+      linesFromFunctionStart
+    );
   }
 
   private async buildScopedPrefix(
@@ -38,28 +57,38 @@ export class PrefixStage {
   ): Promise<string> {
     const cursorLine = position.line;
 
-    const functionStartLine = scopes.enclosingFunction?.range.start.line ?? cursorLine;
-    const classHeaderLines = this.collectClassHeaderLines(document, scopes, functionStartLine);
+    const functionStartLine =
+      scopes.enclosingFunction?.range.start.line ?? cursorLine;
+    const classHeaderLines = PrefixStage.collectClassHeaderLines(
+      document,
+      scopes,
+      functionStartLine
+    );
 
     this.logger(classHeaderLines.join("\n"));
 
     if (!isLargeFunction) {
-      const functionLines = this.collectLinesToCursor(document, functionStartLine, position);
+      const functionLines = PrefixStage.collectLinesToCursor(
+        document,
+        functionStartLine,
+        position
+      );
 
       const usedIdentifiers = extractIdentifiers(
         [...classHeaderLines, ...functionLines].join("\n"),
         document.languageId
       );
 
-      const usedImports = this.getUsedImports(document, usedIdentifiers);
-      const sameFileDeps = await this.localDependencyResolve.collectSameFileDependencies(
-        document,
-        scopes,
-        usedIdentifiers,
-        position
-      );
+      const usedImports = PrefixStage.getUsedImports(document, usedIdentifiers);
+      const sameFileDeps =
+        await this.localDependencyResolve.collectSameFileDependencies(
+          document,
+          scopes,
+          usedIdentifiers,
+          position
+        );
 
-      return this.assemblePrefixParts(
+      return PrefixStage.assemblePrefixParts(
         usedImports,
         sameFileDeps,
         classHeaderLines,
@@ -70,31 +99,34 @@ export class PrefixStage {
     const functionSetupEnd = Math.min(functionStartLine + 30, cursorLine);
     const recentContextStart = Math.max(functionSetupEnd + 1, cursorLine - 100);
 
-    const functionSetupLines = this.collectLinesToCursor(
+    const functionSetupLines = PrefixStage.collectLinesToCursor(
       document,
       functionStartLine,
       new vscode.Position(functionSetupEnd + 1, 0)
     );
-    const recentContextLines = this.collectLinesToCursor(
+    const recentContextLines = PrefixStage.collectLinesToCursor(
       document,
       recentContextStart,
       new vscode.Position(position.line + 1, 0)
     );
 
     const usedIdentifiers = extractIdentifiers(
-      [...classHeaderLines, ...functionSetupLines, recentContextLines].join("\n"),
+      [...classHeaderLines, ...functionSetupLines, recentContextLines].join(
+        "\n"
+      ),
       document.languageId
     );
 
-    const usedImports = this.getUsedImports(document, usedIdentifiers);
-    const sameFileDeps = await this.localDependencyResolve.collectSameFileDependencies(
-      document,
-      scopes,
-      usedIdentifiers,
-      position
-    );
+    const usedImports = PrefixStage.getUsedImports(document, usedIdentifiers);
+    const sameFileDeps =
+      await this.localDependencyResolve.collectSameFileDependencies(
+        document,
+        scopes,
+        usedIdentifiers,
+        position
+      );
 
-    const output = this.assemblePrefixParts(
+    const output = PrefixStage.assemblePrefixParts(
       usedImports,
       sameFileDeps,
       classHeaderLines,
@@ -114,7 +146,7 @@ export class PrefixStage {
     return output.join("\n");
   }
 
-  private collectClassHeaderLines(
+  private static collectClassHeaderLines(
     document: vscode.TextDocument,
     scopes: EnclosingScopes,
     functionStartLine: number
@@ -125,18 +157,24 @@ export class PrefixStage {
       return [];
     }
 
-    const classHeaderEnd = this.findClassHeaderEnd(document, classStartLine);
+    const classHeaderEnd = PrefixStage.findClassHeaderEnd(
+      document,
+      classStartLine
+    );
 
-    return this.collectLinesToCursor(
+    return PrefixStage.collectLinesToCursor(
       document,
       classStartLine,
       new vscode.Position(classHeaderEnd + 1, 0)
     );
   }
 
-  private findClassHeaderEnd(document: vscode.TextDocument, classStartLine: number): number {
+  private static findClassHeaderEnd(
+    document: vscode.TextDocument,
+    classStartLine: number
+  ): number {
     if (document.languageId === "python") {
-      for (let i = classStartLine; i < document.lineCount; i++) {
+      for (let i = classStartLine; i < document.lineCount; i += 1) {
         if (document.lineAt(i).text.includes(":")) {
           return i;
         }
@@ -144,7 +182,11 @@ export class PrefixStage {
       return classStartLine;
     }
 
-    for (let i = classStartLine; i < Math.min(classStartLine + 10, document.lineCount); i++) {
+    for (
+      let i = classStartLine;
+      i < Math.min(classStartLine + 10, document.lineCount);
+      i += 1
+    ) {
       if (document.lineAt(i).text.includes("{")) {
         return i;
       }
@@ -153,7 +195,7 @@ export class PrefixStage {
     return classStartLine;
   }
 
-  private buildSimplifiedPrefix(
+  private static buildSimplifiedPrefix(
     document: vscode.TextDocument,
     position: vscode.Position,
     lineLimit: number
@@ -161,15 +203,27 @@ export class PrefixStage {
     const cursorLine = position.line;
     const startLine = Math.max(0, cursorLine - lineLimit);
 
-    const recentLines = this.collectLinesToCursor(document, startLine, position);
-    const usedIdentifiers = extractIdentifiers(recentLines.join("\n"), document.languageId);
+    const recentLines = PrefixStage.collectLinesToCursor(
+      document,
+      startLine,
+      position
+    );
+    const usedIdentifiers = extractIdentifiers(
+      recentLines.join("\n"),
+      document.languageId
+    );
 
-    const usedImports = this.getUsedImports(document, usedIdentifiers);
+    const usedImports = PrefixStage.getUsedImports(document, usedIdentifiers);
 
-    return this.assemblePrefixParts(usedImports, [], [], recentLines).join("\n");
+    return PrefixStage.assemblePrefixParts(
+      usedImports,
+      [],
+      [],
+      recentLines
+    ).join("\n");
   }
 
-  private assemblePrefixParts(
+  private static assemblePrefixParts(
     usedImports: string[],
     sameFileDeps: string[],
     classHeaderLines: string[],
@@ -196,7 +250,10 @@ export class PrefixStage {
     return output;
   }
 
-  private isAlwaysIncludedImportSpan(lines: string[], languageId: string): boolean {
+  private static isAlwaysIncludedImportSpan(
+    lines: string[],
+    languageId: string
+  ): boolean {
     if (languageId !== "go" && languageId !== "java") {
       return false;
     }
@@ -204,8 +261,11 @@ export class PrefixStage {
     return firstNonEmpty?.startsWith("package ") ?? false;
   }
 
-  private getUsedImports(document: vscode.TextDocument, usedIdentifiers: Set<string>): string[] {
-    const languageId = document.languageId;
+  private static getUsedImports(
+    document: vscode.TextDocument,
+    usedIdentifiers: Set<string>
+  ): string[] {
+    const { languageId } = document;
     const importSpans = findImportLineSpans(document.getText(), languageId);
 
     if (importSpans.length === 0) {
@@ -217,13 +277,17 @@ export class PrefixStage {
     for (const span of importSpans) {
       const importLines: string[] = [];
 
-      for (let i = span.start; i <= span.end && i < document.lineCount; i++) {
+      for (
+        let i = span.start;
+        i <= span.end && i < document.lineCount;
+        i += 1
+      ) {
         importLines.push(document.lineAt(i).text);
       }
 
       const importText = importLines.join("\n");
 
-      if (this.isAlwaysIncludedImportSpan(importLines, languageId)) {
+      if (PrefixStage.isAlwaysIncludedImportSpan(importLines, languageId)) {
         usedImports.push(...importLines);
         continue;
       }
@@ -234,7 +298,7 @@ export class PrefixStage {
 
       const bindings = parseImportBindings(importText, languageId);
 
-      const providedNames = Array.from(bindings.importedLocalNames);
+      const providedNames = [...bindings.importedLocalNames];
 
       const isUsed = providedNames.some((name) => usedIdentifiers.has(name));
 
@@ -250,14 +314,17 @@ export class PrefixStage {
     document: vscode.TextDocument,
     position: vscode.Position
   ): Promise<EnclosingScopes> {
-    const symbols = await this.lspService.getDocumentSymbols(document);
+    const documentSymbols = await this.lspService.getDocumentSymbols(document);
     let enclosingFunction: vscode.DocumentSymbol | null = null;
     let enclosingClass: vscode.DocumentSymbol | null = null;
     let functionDepth = -1;
     let classDepth = -1;
     const symbolsByName = new Map<string, vscode.DocumentSymbol[]>();
 
-    const findEnclosing = (symbols: vscode.DocumentSymbol[], depth: number) => {
+    const findEnclosing = (
+      symbols: vscode.DocumentSymbol[],
+      depth: number
+    ): void => {
       for (const symbol of symbols) {
         const existing = symbolsByName.get(symbol.name);
         if (existing) {
@@ -267,12 +334,15 @@ export class PrefixStage {
         symbolsByName.set(symbol.name, [symbol]);
 
         if (symbol.range.contains(position)) {
-          if (this.isFunctionSymbol(symbol.kind) && depth >= functionDepth) {
+          if (
+            PrefixStage.isFunctionSymbol(symbol.kind) &&
+            depth >= functionDepth
+          ) {
             enclosingFunction = symbol;
             functionDepth = depth;
           }
 
-          if (this.isClassSymbol(symbol.kind) && depth >= classDepth) {
+          if (PrefixStage.isClassSymbol(symbol.kind) && depth >= classDepth) {
             enclosingClass = symbol;
             classDepth = depth;
           }
@@ -284,36 +354,39 @@ export class PrefixStage {
       }
     };
 
-    findEnclosing(symbols, 0);
+    findEnclosing(documentSymbols, 0);
     return { enclosingClass, enclosingFunction, symbolsByName };
   }
 
-  private isFunctionSymbol(kind: vscode.SymbolKind): boolean {
+  private static isFunctionSymbol(kind: vscode.SymbolKind): boolean {
     return [
       vscode.SymbolKind.Function,
       vscode.SymbolKind.Method,
-      vscode.SymbolKind.Constructor
+      vscode.SymbolKind.Constructor,
     ].includes(kind);
   }
 
-  private isClassSymbol(kind: vscode.SymbolKind): boolean {
+  private static isClassSymbol(kind: vscode.SymbolKind): boolean {
     return [
       vscode.SymbolKind.Class,
       vscode.SymbolKind.Interface,
       vscode.SymbolKind.Struct,
-      vscode.SymbolKind.Enum
+      vscode.SymbolKind.Enum,
     ].includes(kind);
   }
 
-  getVerbatimPrefix(document: vscode.TextDocument, position: vscode.Position) {
-    return this.collectLinesToCursor(document, 0, position).join("\n");
+  static getVerbatimPrefix(
+    document: vscode.TextDocument,
+    position: vscode.Position
+  ) {
+    return PrefixStage.collectLinesToCursor(document, 0, position).join("\n");
   }
 
   private logger(message: string) {
     this.outputChannel.appendLine(`[Prefix-stage] ${message}`);
   }
 
-  private collectLinesToCursor(
+  private static collectLinesToCursor(
     document: vscode.TextDocument,
     startLine: number,
     position: vscode.Position
@@ -324,9 +397,11 @@ export class PrefixStage {
 
     const lines: string[] = [];
 
-    for (let i = startLine; i <= position.line; i++) {
+    for (let i = startLine; i <= position.line; i += 1) {
       const lineText = document.lineAt(i).text;
-      lines.push(i === position.line ? lineText.slice(0, position.character) : lineText);
+      lines.push(
+        i === position.line ? lineText.slice(0, position.character) : lineText
+      );
     }
 
     return lines;
