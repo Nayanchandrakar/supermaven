@@ -1,21 +1,27 @@
 import * as vscode from "vscode";
+
 import { BoundedCache } from "@/cache/bounded-cache";
-import { LSPService } from "@/services/lsp-service";
-import { IndexedSymbol } from "@/types";
+import type { LSPService } from "@/services/lsp-service";
+import type { IndexedSymbol } from "@/types";
 import { createCacheKey } from "@/utils/create-cache-key";
 
 export class SymbolIndex {
-  private readonly cache: BoundedCache<{ version: number; symbols: IndexedSymbol[] }>;
-  private readonly trackedUris: Set<string> = new Set();
+  private readonly cache: BoundedCache<{
+    version: number;
+    symbols: IndexedSymbol[];
+  }>;
+  private readonly trackedUris = new Set<string>();
+  private readonly lspService: LSPService;
 
-  constructor(private readonly lspService: LSPService) {
+  constructor(lspService: LSPService) {
+    this.lspService = lspService;
     this.cache = new BoundedCache(1000);
   }
 
   getAllSymbols() {
     const result: IndexedSymbol[] = [];
 
-    for (const uri of Array.from(this.trackedUris)) {
+    for (const uri of this.trackedUris) {
       const cachedKey = createCacheKey("symbolIndex", uri);
       const entry = this.cache.get(cachedKey);
       if (!entry) {
@@ -44,7 +50,10 @@ export class SymbolIndex {
 
     const symbols = await this.lspService.getDocumentSymbols(document);
     const indexedSymbols = this.extractSymbols(symbols, uri);
-    this.cache.set(cachedKey, { version: document.version, symbols: indexedSymbols });
+    this.cache.set(cachedKey, {
+      symbols: indexedSymbols,
+      version: document.version,
+    });
     this.trackedUris.add(uri);
   }
 
@@ -56,31 +65,35 @@ export class SymbolIndex {
     const result: IndexedSymbol[] = [];
 
     for (const symbol of symbols) {
-      if (this.isRelevantSymbolKind(symbol.kind)) {
+      if (SymbolIndex.isRelevantSymbolKind(symbol.kind)) {
         result.push({
-          name: symbol.name,
+          containerName: containerName ?? "",
           kind: symbol.kind,
-          containerName: containerName!,
-          uri,
+          name: symbol.name,
           range: {
-            startLine: symbol.range.start.line,
-            startCharacter: symbol.range.start.character,
+            endCharacter: symbol.range.end.character,
             endLine: symbol.range.end.line,
-            endCharacter: symbol.range.end.character
-          }
+            startCharacter: symbol.range.start.character,
+            startLine: symbol.range.start.line,
+          },
+          uri,
         });
       }
 
       if (symbol.children && symbol.children.length > 0) {
-        const childContainer = containerName ? `${containerName}.${symbol.name}` : symbol.name;
-        result.push(...this.extractSymbols(symbol.children, uri, childContainer));
+        const childContainer = containerName
+          ? `${containerName}.${symbol.name}`
+          : symbol.name;
+        result.push(
+          ...this.extractSymbols(symbol.children, uri, childContainer)
+        );
       }
     }
 
     return result;
   }
 
-  private isRelevantSymbolKind(kind: vscode.SymbolKind): boolean {
+  private static isRelevantSymbolKind(kind: vscode.SymbolKind): boolean {
     return [
       vscode.SymbolKind.Class,
       vscode.SymbolKind.Interface,
@@ -90,7 +103,7 @@ export class SymbolIndex {
       vscode.SymbolKind.Property,
       vscode.SymbolKind.Constant,
       vscode.SymbolKind.TypeParameter,
-      vscode.SymbolKind.Struct
+      vscode.SymbolKind.Struct,
     ].includes(kind);
   }
 

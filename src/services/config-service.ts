@@ -1,16 +1,19 @@
 import * as vscode from "vscode";
-import { DEFAULT_INFERENCE } from "@/constants/inference-config";
+
+import { DEFAULT_INFERENCE } from "@/constants/inference-defaults";
 import { PACKAGE_NAME } from "@/constants/package";
-import { CompletionConfig } from "@/types";
+import type { CompletionConfig } from "@/types";
 
 export class ConfigurationService implements vscode.Disposable {
   private config: CompletionConfig;
   private readonly disposables: vscode.Disposable[] = [];
   private static instance: ConfigurationService | null = null;
-  private readonly changeListeners: Set<(config: CompletionConfig) => void> = new Set();
+  private readonly changeListeners = new Set<
+    (config: CompletionConfig) => void
+  >();
 
   private constructor() {
-    this.config = this.loadConfig();
+    this.config = ConfigurationService.loadConfig();
     this.registerConfigChangeListener();
   }
 
@@ -21,26 +24,35 @@ export class ConfigurationService implements vscode.Disposable {
     return ConfigurationService.instance;
   }
 
-  private loadConfig() {
+  private static loadConfig(): CompletionConfig {
     const config = vscode.workspace.getConfiguration(PACKAGE_NAME);
     return {
-      model: config.get<string>("model", DEFAULT_INFERENCE.model),
-      maxTokens: config.get<number>("maxTokens", DEFAULT_INFERENCE.maxTokens),
-      completionCacheTtlMs: config.get<number>(
-        "completionCacheTtlMs",
-        DEFAULT_INFERENCE.completionCacheTtlMs
-      ),
       completionCacheMaxEntries: config.get<number>(
         "completionCacheMaxEntries",
         DEFAULT_INFERENCE.completionCacheMaxEntries
       ),
-      openrouterApiKey: config.get<string>("openrouterApiKey", DEFAULT_INFERENCE.openrouterApiKey),
-      groqApiKey: config.get<string>("groqApiKey", DEFAULT_INFERENCE.groqApiKey),
-      fireworksApiKey: config.get<string>("fireworksApiKey", DEFAULT_INFERENCE.fireworksApiKey),
+      completionCacheTtlMs: config.get<number>(
+        "completionCacheTtlMs",
+        DEFAULT_INFERENCE.completionCacheTtlMs
+      ),
+      fireworksApiKey: config.get<string>(
+        "fireworksApiKey",
+        DEFAULT_INFERENCE.fireworksApiKey
+      ),
+      groqApiKey: config.get<string>(
+        "groqApiKey",
+        DEFAULT_INFERENCE.groqApiKey
+      ),
       lspCacheMaxEntries: config.get<number>(
         "lspCacheMaxEntries",
         DEFAULT_INFERENCE.lspCacheMaxEntries
-      )
+      ),
+      maxTokens: config.get<number>("maxTokens", DEFAULT_INFERENCE.maxTokens),
+      model: config.get<string>("model", DEFAULT_INFERENCE.model),
+      openrouterApiKey: config.get<string>(
+        "openrouterApiKey",
+        DEFAULT_INFERENCE.openrouterApiKey
+      ),
     };
   }
 
@@ -48,7 +60,7 @@ export class ConfigurationService implements vscode.Disposable {
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration(PACKAGE_NAME)) {
-          this.config = this.loadConfig();
+          this.config = ConfigurationService.loadConfig();
           this.notifyListeners();
         }
       })
@@ -93,19 +105,22 @@ export class ConfigurationService implements vscode.Disposable {
     return this.config.lspCacheMaxEntries;
   }
 
-  onConfigChange(listener: (config: CompletionConfig) => void): vscode.Disposable {
+  onConfigChange(
+    listener: (config: CompletionConfig) => void
+  ): vscode.Disposable {
     this.changeListeners.add(listener);
     return {
-      dispose: () => this.changeListeners.delete(listener)
+      dispose: () => this.changeListeners.delete(listener),
     };
   }
 
   dispose() {
-    this.disposables.forEach((d) => d.dispose());
+    for (const disposable of this.disposables) {
+      disposable.dispose();
+    }
     this.changeListeners.clear();
   }
 }
 
-export function getConfigService(): ConfigurationService {
-  return ConfigurationService.init();
-}
+export const getConfigService = (): ConfigurationService =>
+  ConfigurationService.init();

@@ -1,6 +1,12 @@
-import * as path from "node:path";
+import path from "node:path";
+
 import * as TreeSitter from "web-tree-sitter";
+
 import { LANGUAGE_MAP } from "@/constants/language-map";
+
+type LanguageKey = keyof typeof LANGUAGE_MAP;
+
+const isLanguageKey = (key: string): key is LanguageKey => key in LANGUAGE_MAP;
 
 export class AstService {
   private readonly grammarsDir: string;
@@ -22,7 +28,7 @@ export class AstService {
       const wasmPath = path.join(this.grammarsDir, "web-tree-sitter.wasm");
 
       await TreeSitter.Parser.init({
-        locateFile: () => wasmPath
+        locateFile: () => wasmPath,
       });
 
       this.parser = new TreeSitter.Parser();
@@ -33,14 +39,23 @@ export class AstService {
   }
 
   async ensureLanguage(languageId: string): Promise<boolean> {
-    if (!this.isInitialized || !this.parser) return false;
+    if (!this.isInitialized || !this.parser) {
+      return false;
+    }
+
+    if (!isLanguageKey(languageId)) {
+      return false;
+    }
 
     const wasmFile = LANGUAGE_MAP[languageId];
-    if (!wasmFile) return false;
+    if (!wasmFile) {
+      return false;
+    }
 
     if (this.languageCache.has(wasmFile)) {
-      if (this.currentLanguageId !== languageId) {
-        this.parser.setLanguage(this.languageCache.get(wasmFile)!);
+      const cachedLanguage = this.languageCache.get(wasmFile);
+      if (cachedLanguage && this.currentLanguageId !== languageId) {
+        this.parser.setLanguage(cachedLanguage);
         this.currentLanguageId = languageId;
       }
       return true;
@@ -59,14 +74,18 @@ export class AstService {
   }
 
   parseSync(code: string): TreeSitter.Tree | null {
-    if (!this.isInitialized || !this.parser) return null;
+    if (!this.isInitialized || !this.parser) {
+      return null;
+    }
 
     return this.parser.parse(code);
   }
 
   withParsedTree<T>(code: string, fn: (tree: TreeSitter.Tree) => T): T | null {
     const tree = this.parseSync(code);
-    if (!tree) return null;
+    if (!tree) {
+      return null;
+    }
     try {
       return fn(tree);
     } finally {

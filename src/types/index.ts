@@ -112,6 +112,15 @@ export interface ReplacementRegion {
   range: vscode.Range;
 }
 
+export interface RequestBody {
+  max_tokens: number;
+  messages: ChatMessage[];
+  model: string;
+  stream: boolean;
+  temperature: number;
+  reasoning_effort?: string;
+}
+
 export interface IndexedSymbol {
   name: string;
   kind: number;

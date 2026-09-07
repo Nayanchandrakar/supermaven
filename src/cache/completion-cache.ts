@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 
 import { BoundedCache } from "@/cache/bounded-cache";
 import { getConfigService } from "@/services/config-service";
-import { ReplacementEdit } from "@/types";
+import type { ReplacementEdit } from "@/types";
 import { createCacheKey } from "@/utils/create-cache-key";
 import { generateHash } from "@/utils/generate-hash";
 
@@ -11,7 +11,10 @@ export class CompletionCache implements vscode.Disposable {
   private currentMaxEntries: number;
   private cache: BoundedCache<ReplacementEdit>;
   private readonly disposables: vscode.Disposable[] = [];
-  private contentHashDocument: Map<string, { version: number; hash: string }> = new Map();
+  private contentHashDocument = new Map<
+    string,
+    { version: number; hash: string }
+  >();
 
   constructor() {
     const configService = getConfigService();
@@ -24,16 +27,15 @@ export class CompletionCache implements vscode.Disposable {
       configService.onConfigChange((config) => {
         if (config.completionCacheMaxEntries !== this.currentMaxEntries) {
           this.currentMaxEntries = config.completionCacheMaxEntries;
-          this.cache = new BoundedCache<ReplacementEdit>(this.currentMaxEntries);
+          this.cache = new BoundedCache<ReplacementEdit>(
+            this.currentMaxEntries
+          );
         }
 
         if (config.completionCacheTtlMs !== this.ttlMs) {
           this.ttlMs = config.completionCacheTtlMs;
         }
-      })
-    );
-
-    this.disposables.push(
+      }),
       vscode.workspace.onDidCloseTextDocument((document) => {
         const uri = document.uri.toString();
         this.cache.invalidateGroup(uri);
@@ -51,7 +53,7 @@ export class CompletionCache implements vscode.Disposable {
     }
 
     const hash = generateHash(document.getText());
-    this.contentHashDocument.set(uri, { version: document.version, hash });
+    this.contentHashDocument.set(uri, { hash, version: document.version });
     return hash;
   }
 
@@ -89,11 +91,16 @@ export class CompletionCache implements vscode.Disposable {
       position.character,
       editHistoryHash
     );
-    this.cache.set(key, completion, { ttlMs: this.ttlMs, groupKey: documentUri });
+    this.cache.set(key, completion, {
+      groupKey: documentUri,
+      ttlMs: this.ttlMs,
+    });
   }
 
   dispose() {
-    this.disposables.forEach((d) => d.dispose());
+    for (const d of this.disposables) {
+      d.dispose();
+    }
     this.cache.clear();
     this.contentHashDocument.clear();
   }
