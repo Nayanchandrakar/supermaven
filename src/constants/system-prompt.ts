@@ -1,13 +1,13 @@
 export const DEFAULT_PROMPT_OVERHEAD_TOKENS = 50;
 
 export const DEFAULT_BUDGET = {
-    systemPrompt: 1000,
-    currentFile: 6000,
-    importedSignatures: 3000,
-    editHistory: 1500,
-    outputSpace: 3000,
-    buffer: 1000,
-    total: 15000,
+  buffer: 1000,
+  currentFile: 6000,
+  editHistory: 1500,
+  importedSignatures: 3000,
+  outputSpace: 3000,
+  systemPrompt: 1000,
+  total: 15_000,
 };
 
 export const SYSTEM_PROMPT = `

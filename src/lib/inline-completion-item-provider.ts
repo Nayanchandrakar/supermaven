@@ -1,28 +1,50 @@
 import * as vscode from "vscode";
 
-import { CompletionCache } from "@/cache/completion-cache";
-import { ApiClient } from "@/lib/api-client";
-import { ContextGatherer } from "@/lib/context-gatherer";
-import { IntentTrackerService } from "@/services/intent-tracker-service";
-import type { ChatMessage, PendingCompletion, ReplacementEdit } from "@/types";
+import type { CompletionCache } from "@/cache/completion-cache";
+import type { ApiClient } from "@/lib/api-client";
+import type { ContextGatherer } from "@/lib/context-gatherer";
+import type { DeduplicationService } from "@/services/deduplication-service";
+import type { IntentTrackerService } from "@/services/intent-tracker-service";
 import { PromptBuilder } from "@/services/prompt-builder";
-import { DeduplicationService } from "@/services/deduplication-service";
+import type { ChatMessage, PendingCompletion, ReplacementEdit } from "@/types";
+import type { DeletionDecoration } from "@/utils/deletion-decoration";
 
-export class InlineCompletionItemProvider implements vscode.InlineCompletionItemProvider {
+export class InlineCompletionItemProvider
+  implements vscode.InlineCompletionItemProvider
+{
   private pendingCompletion: PendingCompletion | null = null;
-  private lastCompletionText: string = "";
+  private lastCompletionText = "";
   private lastCompletionUri: string | null = null;
   private lastCompletionPosition: vscode.Position | null = null;
+  private readonly outputChannel: vscode.OutputChannel;
+  private readonly apiClient: ApiClient;
+  private readonly intentTracker: IntentTrackerService;
+  private readonly completionCache: CompletionCache;
+  private readonly contextGatherer: ContextGatherer;
+  private readonly deduplicationService: DeduplicationService;
+  private readonly deletionDecoration: DeletionDecoration;
 
   constructor(
-    private readonly outputChannel: vscode.OutputChannel,
-    private readonly apiClient: ApiClient,
-    private readonly intentTracker: IntentTrackerService,
-    private readonly completionCache: CompletionCache,
-    private readonly contextGatherer: ContextGatherer,
-    private readonly promptBuilder: PromptBuilder,
-    private readonly deduplicationService: DeduplicationService
-  ) { }
+    outputChannel: vscode.OutputChannel,
+    apiClient: ApiClient,
+    intentTracker: IntentTrackerService,
+    completionCache: CompletionCache,
+    contextGatherer: ContextGatherer,
+    deduplicationService: DeduplicationService,
+    deletionDecoration: DeletionDecoration
+  ) {
+    this.outputChannel = outputChannel;
+    this.apiClient = apiClient;
+    this.intentTracker = intentTracker;
+    this.completionCache = completionCache;
+    this.contextGatherer = contextGatherer;
+    this.deduplicationService = deduplicationService;
+    this.deletionDecoration = deletionDecoration;
+  }
+
+  getPendingEdit(): ReplacementEdit | null {
+    return this.pendingCompletion?.edit ?? null;
+  }
 
   async provideInlineCompletionItems(
     document: vscode.TextDocument,
@@ -30,16 +52,25 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     _context: vscode.InlineCompletionContext,
     token: vscode.CancellationToken
   ): Promise<vscode.InlineCompletionList | null> {
-    this.logger(`${document.fileName} ${document.uri} ${position.line} ${position.character}`);
+    this.logger(
+      `${document.fileName} ${document.uri} ${position.line} ${position.character}`
+    );
 
-    const pendingCompletionResult = this.handlePendingCompletionCheck(document, position);
+    const pendingCompletionResult = this.handlePendingCompletionCheck(
+      document,
+      position
+    );
 
     if (pendingCompletionResult !== undefined) {
-      return pendingCompletionResult!;
+      return pendingCompletionResult;
     }
 
     const editHistoryHash = this.intentTracker.computeHash();
-    const cachedResult = this.tryCachedCompletion(document, position, editHistoryHash);
+    const cachedResult = this.tryCachedCompletion(
+      document,
+      position,
+      editHistoryHash
+    );
 
     if (cachedResult) {
       return cachedResult;
@@ -51,10 +82,14 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       return continuationResult;
     }
 
-    const completionContext = await this.contextGatherer.gatherContext(document, position);
-    const messages = this.promptBuilder.buildPrompt(completionContext)
+    const completionContext = await this.contextGatherer.gatherContext(
+      document,
+      position
+    );
 
-    this.logger(`Prefix: ${JSON.stringify(completionContext)}`)
+    const messages = PromptBuilder.buildPrompt(completionContext);
+
+    this.logger(`Prefix: ${JSON.stringify(completionContext)}`);
 
     if (token.isCancellationRequested) {
       this.logger("Request cancelled");
@@ -68,16 +103,33 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       this.logger(`Api error: ${error}`);
     }
 
-
-    result = this.cleanCompletionText(result)
-    const dedupResult = this.deduplicationService.check(document, position, result)
+    result = InlineCompletionItemProvider.cleanCompletionText(result);
+    const dedupResult = this.deduplicationService.check(
+      document,
+      position,
+      result
+    );
 
     if (!dedupResult.proceed) {
-      this.logger(`Deduplication rejected: ${dedupResult.reasonText ?? "no reason provider"}`)
+      this.logger(
+        `Deduplication rejected: ${dedupResult.reasonText ?? "no reason provider"}`
+      );
       return null;
     }
 
-    const edit: ReplacementEdit = { insertText: result, startPosition: position };
+    const edit = InlineCompletionItemProvider.computeMinimalReplacement(
+      document,
+      completionContext.replacementRegion.range.start,
+      completionContext.replacementRegion.range.end,
+      result
+    );
+
+    if (!edit || edit.insertText.length === 0) {
+      this.logger(`No changes detected in the completion`);
+      return null;
+    }
+
+    this.logger(`Replacement Edit ${JSON.stringify(edit)}`);
 
     this.completionCache.set(document, position, editHistoryHash, edit);
     return this.activateCompletion(edit, document);
@@ -88,7 +140,11 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     position: vscode.Position,
     editHistory: string
   ): vscode.InlineCompletionList | undefined {
-    const cachedEdit = this.completionCache.get(document, position, editHistory);
+    const cachedEdit = this.completionCache.get(
+      document,
+      position,
+      editHistory
+    );
 
     this.logger(`Cache hit ${cachedEdit?.insertText}`);
 
@@ -103,17 +159,27 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     document: vscode.TextDocument,
     position: vscode.Position
   ): vscode.InlineCompletionList | undefined | null {
-    if (!this.lastCompletionText || !this.lastCompletionPosition || !this.lastCompletionUri) {
+    if (
+      !this.lastCompletionText ||
+      !this.lastCompletionPosition ||
+      !this.lastCompletionUri
+    ) {
       return undefined;
     }
 
-    const charsSinceCompletion = position.character - this.lastCompletionPosition.character;
+    const charsSinceCompletion =
+      position.character - this.lastCompletionPosition.character;
 
-    if (position.line !== this.lastCompletionPosition.line || charsSinceCompletion <= 0) {
+    if (
+      position.line !== this.lastCompletionPosition.line ||
+      charsSinceCompletion <= 0
+    ) {
       return undefined;
     }
 
-    const typedText = document.getText(new vscode.Range(this.lastCompletionPosition, position));
+    const typedText = document.getText(
+      new vscode.Range(this.lastCompletionPosition, position)
+    );
 
     if (
       charsSinceCompletion >= this.lastCompletionText.length &&
@@ -122,8 +188,13 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       const remainingText = this.lastCompletionText.slice(typedText.length);
 
       if (remainingText) {
-        this.logger(`Continuing prediction: typed "${typedText}", remaining "${remainingText}" `);
-        return this.createInlineCompletionList(remainingText, new vscode.Range(position, position));
+        this.logger(
+          `Continuing prediction: typed "${typedText}", remaining "${remainingText}" `
+        );
+        return InlineCompletionItemProvider.createInlineCompletionList(
+          remainingText,
+          new vscode.Range(position, position)
+        );
       }
 
       this.logger("User completed entire prediction");
@@ -132,7 +203,9 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       return null;
     }
 
-    this.logger(`Divergence detected: expected ${this.lastCompletionText}, got ${typedText}`);
+    this.logger(
+      `Divergence detected: expected ${this.lastCompletionText}, got ${typedText}`
+    );
     this.lastCompletionText = "";
     this.lastCompletionPosition = null;
     return undefined;
@@ -143,28 +216,45 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     document: vscode.TextDocument
   ): vscode.InlineCompletionList {
     this.lastCompletionText = edit.insertText;
-    this.lastCompletionPosition = edit.startPosition;
+    this.lastCompletionPosition = edit.deleteRange.start;
     this.lastCompletionUri = document.uri.toString();
 
     this.pendingCompletion = {
       documentUri: document.uri.toString(),
-      edit
+      edit,
     };
 
-    return this.createInlineCompletionList(edit.insertText);
+    if (edit.deletedText.length > 0) {
+      const editor = vscode.window.activeTextEditor;
+      if (
+        editor &&
+        editor.document.uri.toString() === document.uri.toString()
+      ) {
+        const decorationRange = edit.actualDeleteRange ?? edit.deleteRange;
+        this.deletionDecoration.showDeletion(editor, decorationRange);
+      }
+    }
+
+    return InlineCompletionItemProvider.createInlineCompletionList(
+      edit.insertText,
+      edit.deleteRange
+    );
   }
 
-  private createInlineCompletionList(
+  private static createInlineCompletionList(
     result: string,
     range?: vscode.Range
   ): vscode.InlineCompletionList {
     return { items: [new vscode.InlineCompletionItem(result, range)] };
   }
 
-  private async callCompletionApi(messages: ChatMessage[], token: vscode.CancellationToken) {
+  private async callCompletionApi(
+    messages: ChatMessage[],
+    token: vscode.CancellationToken
+  ) {
     const generator = await this.apiClient.complete(messages);
 
-    let result: string = "";
+    let result = "";
 
     for await (const chunk of generator) {
       if (token.isCancellationRequested) {
@@ -178,11 +268,11 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     return result;
   }
 
-
-  private cleanCompletionText(text: string): string {
-    let cleaned = text.replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
-    const explanationPattern = /\n\n(?:\/\/|\/\*|#|Note:|Explanation:)[\s\S]*$/;
-    cleaned = cleaned.replace(explanationPattern, '');
+  private static cleanCompletionText(text: string): string {
+    let cleaned = text.replace(/^```\w*\n?/u, "").replace(/\n?```$/u, "");
+    const explanationPattern =
+      /\n\n(?:\/\/|\/\*|#|Note:|Explanation:)[\s\S]*$/u;
+    cleaned = cleaned.replace(explanationPattern, "");
     return cleaned.trimEnd();
   }
 
@@ -190,10 +280,12 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
     document: vscode.TextDocument,
     position: vscode.Position
   ): vscode.InlineCompletionList | null | undefined {
-    if (!this.pendingCompletion) return undefined;
+    if (!this.pendingCompletion) {
+      return undefined;
+    }
 
     const pendingDocumentUri = this.pendingCompletion.documentUri;
-    const pendingPosition = this.pendingCompletion.edit.startPosition;
+    const pendingPosition = this.pendingCompletion.edit.deleteRange.start;
 
     if (
       pendingDocumentUri !== document.uri.toString() ||
@@ -204,14 +296,76 @@ export class InlineCompletionItemProvider implements vscode.InlineCompletionItem
       return undefined;
     }
 
-    return this.createInlineCompletionList(this.pendingCompletion.edit.insertText);
+    return InlineCompletionItemProvider.createInlineCompletionList(
+      this.pendingCompletion.edit.insertText
+    );
   }
 
-  private clearPendingCompletion() {
+  clearPendingCompletion() {
     this.pendingCompletion = null;
+    this.deletionDecoration.clearDecorations();
+  }
+
+  private static computeMinimalReplacement(
+    document: vscode.TextDocument,
+    regionStart: vscode.Position,
+    regionEnd: vscode.Position,
+    newText: string
+  ): ReplacementEdit | null {
+    const oldText = document.getText(new vscode.Range(regionStart, regionEnd));
+    if (oldText === newText) {
+      return null;
+    }
+
+    const minLength = Math.min(oldText.length, newText.length);
+
+    let prefixLength = 0;
+    while (
+      prefixLength < minLength &&
+      oldText[prefixLength] === newText[prefixLength]
+    ) {
+      prefixLength += 1;
+    }
+
+    let suffixLength = 0;
+    const maxSuffixLength = minLength - prefixLength;
+    while (
+      suffixLength < maxSuffixLength &&
+      oldText[oldText.length - 1 - suffixLength] ===
+        newText[newText.length - 1 - suffixLength]
+    ) {
+      suffixLength += 1;
+    }
+
+    const oldDiffEnd = oldText.length - suffixLength;
+    const newDiffEnd = newText.length - suffixLength;
+    const deletedText = oldText.slice(prefixLength, oldDiffEnd);
+
+    const regionStartOffset = document.offsetAt(regionStart);
+    const actualDeleteStart = document.positionAt(
+      regionStartOffset + prefixLength
+    );
+    const actualDeleteEnd = document.positionAt(regionStartOffset + oldDiffEnd);
+
+    return {
+      actualDeleteRange: deletedText
+        ? new vscode.Range(actualDeleteStart, actualDeleteEnd)
+        : undefined,
+      deleteRange: new vscode.Range(regionStart, actualDeleteEnd),
+      deletedText,
+      insertText: newText.slice(0, newDiffEnd),
+    };
   }
 
   private logger(message: string) {
     this.outputChannel.appendLine(`[Provider] ${message}`);
+  }
+
+  dispose(): void {
+    this.completionCache.dispose();
+    this.apiClient.dispose();
+    this.intentTracker.dispose();
+    this.contextGatherer.dispose();
+    this.deletionDecoration.dispose();
   }
 }

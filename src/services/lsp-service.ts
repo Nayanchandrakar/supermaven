@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
+
 import { BoundedCache } from "@/cache/bounded-cache";
-import { DefinitionTarget, RawTypeHeirarchyItems } from "@/types";
+import type { DefinitionTarget, RawTypeHeirarchyItems } from "@/types";
 import { createCacheKey } from "@/utils/create-cache-key";
+
 import { getConfigService } from "./config-service";
 
 export class LSPService implements vscode.Disposable {
@@ -15,10 +17,10 @@ export class LSPService implements vscode.Disposable {
     this.cache = new BoundedCache(this.currentMaxEntries);
 
     this.disposables.push(
-      config.onConfigChange((config) => {
-        if (config.lspCacheMaxEntries !== this.currentMaxEntries) {
-          this.cache = new BoundedCache(config.lspCacheMaxEntries);
-          this.currentMaxEntries = config.lspCacheMaxEntries;
+      config.onConfigChange((newConfig) => {
+        if (newConfig.lspCacheMaxEntries !== this.currentMaxEntries) {
+          this.cache = new BoundedCache(newConfig.lspCacheMaxEntries);
+          this.currentMaxEntries = newConfig.lspCacheMaxEntries;
         }
       })
     );
@@ -37,22 +39,28 @@ export class LSPService implements vscode.Disposable {
     );
   }
 
-  async getDocumentSymbols(document: vscode.TextDocument): Promise<vscode.DocumentSymbol[]> {
+  async getDocumentSymbols(
+    document: vscode.TextDocument
+  ): Promise<vscode.DocumentSymbol[]> {
     const documentUri = document.uri.toString();
 
     const cacheKey = createCacheKey(documentUri, "documentSymbols");
 
-    const cached = this.cache.get(cacheKey) as vscode.DocumentSymbol[] | undefined;
+    // SAFETY: Cache stores DocumentSymbol[] values for documentSymbols keys
+    const cached = this.cache.get(cacheKey) as
+      | vscode.DocumentSymbol[]
+      | undefined;
 
     if (cached !== undefined) {
       return cached;
     }
 
     try {
-      const symbols: vscode.DocumentSymbol[] = await vscode.commands.executeCommand(
-        "vscode.executeDocumentSymbolProvider",
-        document.uri
-      );
+      const symbols: vscode.DocumentSymbol[] =
+        await vscode.commands.executeCommand(
+          "vscode.executeDocumentSymbolProvider",
+          document.uri
+        );
 
       this.cache.set(cacheKey, symbols, { groupKey: documentUri });
       return symbols;
@@ -73,23 +81,27 @@ export class LSPService implements vscode.Disposable {
       `${position.line}:${position.character}`
     );
 
+    // SAFETY: Cache stores string[] values for superTypes keys
     const cached = this.cache.get(cacheKey) as string[] | undefined;
 
     if (cached !== undefined) {
       return cached;
     }
 
-    const prepared = await vscode.commands.executeCommand<RawTypeHeirarchyItems>(
-      "vscode.prepareTypeHeirarchy",
-      documentUri,
-      position
-    );
+    const prepared =
+      await vscode.commands.executeCommand<RawTypeHeirarchyItems>(
+        "vscode.prepareTypeHeirarchy",
+        documentUri,
+        position
+      );
 
     if (!prepared) {
       return [];
     }
 
-    const roots: DefinitionTarget[] = Array.isArray(prepared) ? prepared : [prepared];
+    const roots: DefinitionTarget[] = Array.isArray(prepared)
+      ? prepared
+      : [prepared];
 
     try {
       const superTypeResults = await Promise.allSettled(
@@ -123,7 +135,9 @@ export class LSPService implements vscode.Disposable {
   }
 
   dispose() {
-    this.disposables.forEach((d) => d.dispose());
+    for (const d of this.disposables) {
+      d.dispose();
+    }
     this.cache.clear();
   }
 }

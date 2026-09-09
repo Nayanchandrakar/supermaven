@@ -1,1 +1,1 @@
-export const PACKAGE_NAME = "cursor-tab";
+export const PACKAGE_NAME = "supermaven";

@@ -1,11 +1,11 @@
-export function createCacheKey(...parts: Array<string | number>) {
+export const createCacheKey = (...parts: (string | number)[]): string => {
   let key = "";
 
   for (const part of parts) {
-    const typePrefix = typeof part === "number" ? "n" : "s";
     const value = String(part);
+    const typePrefix = Number.isInteger(part) ? "n" : "s";
     key += `${typePrefix}${value.length}:${value}|`;
   }
 
   return key;
-}
+};

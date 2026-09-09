@@ -1,22 +1,21 @@
 {
-  "name": "cursor-tab",
-  "displayName": "cursor-tab",
+  "name": "supermaven",
+  "displayName": "supermaven",
   "version": "0.0.1",
   "private": true,
-  "description": "cursor-tab-completion",
+  "description": "supermaven-completion",
   "categories": [
     "Other"
   ],
+  "publisher": "Nayanchandrakar",
   "type": "module",
   "main": "./dist/extension.mjs",
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "format": "oxfmt",
-    "format:check": "oxfmt --check",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
     "postinstall": "bun scripts/setup-grammars.ts",
+    "check": "ultracite check",
+    "fix": "ultracite fix",
     "prepare": "husky"
   },
   "dependencies": {
@@ -26,12 +25,12 @@
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
     "@types/emscripten": "^1.41.6",
-    "@types/node": "^26.2.0",
-    "@types/vscode": "^1.125.0",
+    "@types/node": "^26.4.1",
+    "@types/vscode": "^1.136.0",
     "husky": "^9.1.7",
-    "lint-staged": "^17.3.0",
-    "oxfmt": "^0.63.0",
-    "oxlint": "^1.78.0",
+    "lint-staged": "^17.5.0",
+    "oxfmt": "^0.66.0",
+    "oxlint": "^1.81.0",
     "oxlint-tsgolint": "^7.0.2001",
     "tree-sitter-bash": "^0.25.1",
     "tree-sitter-c": "^0.24.1",
@@ -47,42 +46,73 @@
     "tree-sitter-scala": "^0.24.0",
     "tree-sitter-typescript": "^0.23.2",
     "tsdown": "^0.22.14",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "ultracite": "7.11.0"
   },
   "lint-staged": {
-    "*": "oxfmt --no-error-on-unmatched-pattern",
-    "*.{js,jsx,ts,tsx,mjs,cjs}": "bun run lint"
+    "*.{js,jsx,ts,tsx,json,jsonc,css,scss,md,mdx}": [
+      "bun x ultracite fix"
+    ]
   },
   "contributes": {
+    "keybindings": [
+      {
+        "command": "supermaven.acceptCompletion",
+        "key": "tab",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "supermaven.rejectCompletion",
+        "key": "escape",
+        "when": "editorTextFocus"
+      }
+    ],
     "configuration": [
       {
-        "title": "Cursor tab completion",
+        "title": "Supermaven",
         "properties": {
-          "cursor-tab.openrouterApiKey": {
+          "supermaven.openrouterApiKey": {
             "type": "string",
             "default": "",
             "description": "Openrouter Api key"
           },
-          "cursor-tab.model": {
+          "supermaven.groqApiKey": {
+            "type": "string",
+            "default": "",
+            "description": "Groq Api key"
+          },
+          "supermaven.fireworksApiKey": {
+            "type": "string",
+            "default": "",
+            "description": "Fireworks Api key"
+          },
+          "supermaven.model": {
             "type": "string",
             "description": "Model to use for tab completion",
-            "default": "stealth/ox-alpha"
+            "default": "qwen/qwen3.8-27b"
           },
-          "cursor-tab.completionCacheMaxEntries": {
+          "supermaven.maxTokens": {
+            "type": "number",
+            "default": 500,
+            "minimum": 50,
+            "maximum": 5000,
+            "description": "Maximum tokens to generate"
+          },
+          "supermaven.completionCacheMaxEntries": {
             "type": "number",
             "default": 100,
             "minimum": 10,
             "maximum": 1000,
             "description": "Maximum entries in completion cache"
           },
-          "cursor-tab.completionCacheTtlMs": {
+          "supermaven.completionCacheTtlMs": {
             "type": "number",
             "default": 30000,
             "minimum": 5000,
             "maximum": 120000,
             "description": "Completion cache in TTL in seconds"
           },
-          "cursor-tab.lspCacheMaxEntries": {
+          "supermaven.lspCacheMaxEntries": {
             "type": "number",
             "default": 100,
             "minimum": 10,
@@ -92,7 +122,18 @@
         }
       }
     ],
-    "commands": []
+    "commands": [
+      {
+        "command": "supermaven.acceptCompletion",
+        "title": "Accept Completion",
+        "category": "Supermaven"
+      },
+      {
+        "command": "supermaven.rejectCompletion",
+        "title": "Reject Completion",
+        "category": "Supermaven"
+      }
+    ]
   },
   "activationEvents": [
     "onStartupFinished"

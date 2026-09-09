@@ -2,14 +2,15 @@ export const JS_TS_LANGUAGES = [
   "typescript",
   "typescriptreact",
   "javascript",
-  "javascriptreact"
+  "javascriptreact",
 ] as const;
 
 export type JsTsLanguageId = (typeof JS_TS_LANGUAGES)[number];
 
-export function isJavaScriptOrTypeScript(languageId: string): boolean {
-  return (JS_TS_LANGUAGES as readonly string[]).includes(languageId);
-}
+// SAFETY: JS_TS_LANGUAGES is declared with `as const`, so its type is a tuple of literals.
+// Casting to readonly string[] is safe for the `.includes()` check.
+export const isJavaScriptOrTypeScript = (languageId: string): boolean =>
+  (JS_TS_LANGUAGES as readonly string[]).includes(languageId);
 
 export const JS_KEYWORDS = new Set([
   "break",
@@ -61,7 +62,7 @@ export const JS_KEYWORDS = new Set([
   "await",
   "of",
   "get",
-  "set"
+  "set",
 ]);
 
 export const PYTHON_KEYWORDS = new Set([
@@ -99,7 +100,7 @@ export const PYTHON_KEYWORDS = new Set([
   "try",
   "while",
   "with",
-  "yield"
+  "yield",
 ]);
 
 export const RUST_KEYWORDS = new Set([
@@ -153,7 +154,7 @@ export const RUST_KEYWORDS = new Set([
   "typeof",
   "unsized",
   "virtual",
-  "yield"
+  "yield",
 ]);
 
 export const GO_KEYWORDS = new Set([
@@ -221,7 +222,7 @@ export const GO_KEYWORDS = new Set([
   "print",
   "println",
   "real",
-  "recover"
+  "recover",
 ]);
 
 export const JAVA_KEYWORDS = new Set([
@@ -294,7 +295,7 @@ export const JAVA_KEYWORDS = new Set([
   "record",
   "sealed",
   "permits",
-  "non-sealed"
+  "non-sealed",
 ]);
 
 export const C_KEYWORDS = new Set([
@@ -347,7 +348,7 @@ export const C_KEYWORDS = new Set([
   // Common macros treated as keywords
   "NULL",
   "true",
-  "false"
+  "false",
 ]);
 
 export const CPP_KEYWORDS = new Set([
@@ -446,10 +447,10 @@ export const CPP_KEYWORDS = new Set([
   "xor",
   "xor_eq",
   // Common macros
-  "NULL"
+  "NULL",
 ]);
 
-export function isKeyword(word: string, languageId: string): boolean {
+export const isKeyword = (word: string, languageId: string): boolean => {
   if (isJavaScriptOrTypeScript(languageId)) {
     return JS_KEYWORDS.has(word);
   }
@@ -479,51 +480,50 @@ export function isKeyword(word: string, languageId: string): boolean {
   }
 
   return false;
-}
+};
 
-function isIdentifierStart(ch: number): boolean {
-  return (
-    (ch >= 65 && ch <= 90) || // A-Z
-    (ch >= 97 && ch <= 122) || // a-z
-    ch === 95
-  ); // _
-}
+// A-Z, a-z, _
+const isIdentifierStart = (ch: number): boolean =>
+  (ch >= 65 && ch <= 90) || (ch >= 97 && ch <= 122) || ch === 95;
 
-function isIdentifierPart(ch: number): boolean {
-  return isIdentifierStart(ch) || (ch >= 48 && ch <= 57); // 0-9
-}
+const isIdentifierPart = (ch: number): boolean =>
+  isIdentifierStart(ch) || (ch >= 48 && ch <= 57);
 
-export function extractIdentifiers(text: string, languageId: string): Set<string> {
+export const extractIdentifiers = (
+  text: string,
+  languageId: string
+): Set<string> => {
   const identifiers = new Set<string>();
 
   let i = 0;
   const len = text.length;
 
   while (i < len) {
-    const ch = text.charCodeAt(i);
+    const ch = text.codePointAt(i);
 
-    if (isIdentifierStart(ch)) {
-      // Found start of identifier
+    if (ch !== undefined && isIdentifierStart(ch)) {
       const start = i;
-      i++;
-      while (i < len && isIdentifierPart(text.charCodeAt(i))) {
-        i++;
+      i += 1;
+      while (i < len && isIdentifierPart(text.codePointAt(i) ?? 0)) {
+        i += 1;
       }
       const identifier = text.slice(start, i);
 
-      // Filter out keywords
       if (!isKeyword(identifier, languageId)) {
         identifiers.add(identifier);
       }
     } else {
-      i++;
+      i += 1;
     }
   }
 
   return identifiers;
-}
+};
 
-export function getTruncationMarker(languageId: string, skippedLines: number): string {
+export const getTruncationMarker = (
+  languageId: string,
+  skippedLines: number
+): string => {
   const message = `... ${skippedLines} lines truncated ...`;
   if (languageId === "python") {
     return `# ${message}`;
@@ -535,52 +535,65 @@ export function getTruncationMarker(languageId: string, skippedLines: number): s
     return `/* ${message} */`;
   }
   return `// ${message}`;
-}
+};
 
-export function normalizeText(text: string): string {
-  return text.replace(/\s+/g, " ").trim().toLowerCase();
-}
+export const normalizeText = (text: string): string =>
+  text.replaceAll(/\s+/gu, " ").trim().toLowerCase();
 
 /**
  * Compute similarity between two strings (Levenshtein-based). Returns a value between 0 (completely
  * different) and 1 (identical).
  */
-export function stringSimilarity(a: string, b: string): number {
-  const maxLen = Math.max(a.length, b.length);
-  if (maxLen === 0) return 1.0;
-
-  const distance = levenshteinDistance(a, b);
-  return 1 - distance / maxLen;
-}
-
 /**
  * Compute Levenshtein distance between two strings. Returns the minimum number of single-character
  * edits (insertions, deletions, substitutions) required to change one string into the other.
  */
-export function levenshteinDistance(a: string, b: string): number {
+export const levenshteinDistance = (a: string, b: string): number => {
   const rows = a.length + 1;
   const cols = b.length + 1;
-  // oxlint-disable-next-line unicorn/no-new-array
-  const matrix: number[][] = Array.from({ length: rows }, () => new Array<number>(cols).fill(0));
+  const matrix: number[][] = Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => 0)
+  );
 
-  for (let i = 0; i < rows; i++) {
-    matrix[i]![0] = i;
-  }
-
-  for (let j = 0; j < cols; j++) {
-    matrix[0]![j] = j;
-  }
-
-  for (let i = 1; i < rows; i++) {
-    for (let j = 1; j < cols; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      matrix[i]![j] = Math.min(
-        matrix[i - 1]![j]! + 1,
-        matrix[i]![j - 1]! + 1,
-        matrix[i - 1]![j - 1]! + cost
-      );
+  for (let i = 0; i < rows; i += 1) {
+    const row = matrix[i];
+    if (row) {
+      row[0] = i;
     }
   }
 
-  return matrix[a.length]![b.length]!;
-}
+  const [firstRow] = matrix;
+  if (firstRow) {
+    for (let j = 0; j < cols; j += 1) {
+      firstRow[j] = j;
+    }
+  }
+
+  for (let i = 1; i < rows; i += 1) {
+    for (let j = 1; j < cols; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const currentRow = matrix[i];
+      const prevRow = matrix[i - 1];
+      if (currentRow && prevRow) {
+        currentRow[j] = Math.min(
+          (prevRow[j] ?? 0) + 1,
+          (currentRow[j - 1] ?? 0) + 1,
+          (prevRow[j - 1] ?? 0) + cost
+        );
+      }
+    }
+  }
+
+  const lastRow = matrix[a.length];
+  return lastRow?.[b.length] ?? 0;
+};
+
+export const stringSimilarity = (a: string, b: string): number => {
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen === 0) {
+    return 1;
+  }
+
+  const distance = levenshteinDistance(a, b);
+  return 1 - distance / maxLen;
+};

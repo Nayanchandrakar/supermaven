@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  unbundle: true,
+  deps: { neverBundle: ["vscode"] },
   entry: ["src/**/*"],
-  deps: { neverBundle: ["vscode"] }
+  unbundle: true,
 });

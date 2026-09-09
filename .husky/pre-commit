@@ -1,1 +1,5 @@
 lint-staged
+# ultracite
+#!/bin/sh
+bun x lint-staged
+# ultracite end

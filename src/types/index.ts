@@ -1,8 +1,13 @@
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
 
-export type InferenceProvider = "openrouter";
+export type InferenceProvider = "openrouter" | "groq" | "fireworks";
 export type Role = "system" | "assistant" | "user";
-export type IntentType = "added" | "pasted" | "edited" | "accepted" | "rejected";
+export type IntentType =
+  | "added"
+  | "pasted"
+  | "edited"
+  | "accepted"
+  | "rejected";
 
 export interface InferenceProviderConfig {
   url: string;
@@ -14,7 +19,8 @@ export interface CompletionConfig {
   model: string;
   maxTokens: number;
   openrouterApiKey: string;
-
+  groqApiKey: string;
+  fireworksApiKey: string;
   // Ceche settings
   completionCacheMaxEntries: number;
   completionCacheTtlMs: number;
@@ -41,8 +47,10 @@ export interface ChatMessage {
 }
 
 export interface ReplacementEdit {
+  deleteRange: vscode.Range;
   insertText: string;
-  startPosition: vscode.Position;
+  deletedText: string;
+  actualDeleteRange: vscode.Range | undefined;
 }
 
 export interface PendingCompletion {
@@ -67,7 +75,6 @@ export interface IntentEntry {
   lineRange: { start: number; end: number };
   content: string;
   timestamp: number;
-  suggestionPreview?: string;
 }
 
 export interface CacheEntry<T> {
@@ -102,7 +109,16 @@ export interface DefinitionTarget {
 
 export interface ReplacementRegion {
   text: string;
-  range: vscode.Range
+  range: vscode.Range;
+}
+
+export interface RequestBody {
+  max_tokens: number;
+  messages: ChatMessage[];
+  model: string;
+  stream: boolean;
+  temperature: number;
+  reasoning_effort?: string;
 }
 
 export interface IndexedSymbol {
@@ -125,5 +141,42 @@ export interface NearbyContext {
   nearbyIdentifiers: Set<string>;
 }
 
+export interface CompletionContext {
+  prefix: string;
+  replacementRegion: ReplacementRegion;
+  suffixAfterRegion: string;
+  cursorPosition: vscode.Position;
+  languageId: string;
+  filePath: string;
+  editHistory: string;
+  crossFileSymbols: IndexedSymbol[];
+}
 
-export type RawTypeHeirarchyItems = vscode.TypeHierarchyItem | vscode.TypeHierarchyItem[];
+export interface FitToBudgetInput {
+  systemPrompt: string;
+  prefix: string;
+  replaceRegion: string;
+  suffix: string;
+  importedSignatures: string[];
+  editHistory: string;
+  languageId: string;
+  promptOverheadTokens?: number;
+}
+
+export interface FitToBudgetResult {
+  prefix: string;
+  replaceRegion: string;
+  suffix: string;
+  importedSignatures: string;
+  editHistory: string;
+}
+
+export interface DedupOutput {
+  proceed: boolean;
+  completion: string;
+  reasonText?: string;
+}
+
+export type RawTypeHeirarchyItems =
+  | vscode.TypeHierarchyItem
+  | vscode.TypeHierarchyItem[];
