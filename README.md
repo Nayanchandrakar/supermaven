@@ -166,15 +166,13 @@ Budgets are enforced with a ~4 characters/token estimate: the current file is th
 
 AST-assisted features use packaged Tree-sitter grammars. These VS Code language IDs are wired up today:
 
-| Language | Grammar | Language | Grammar |
-| --- | --- | --- | --- |
-| Bash | `tree-sitter-bash` | Java | `tree-sitter-java` |
-| C | `tree-sitter-c` | JavaScript | `tree-sitter-javascript` |
-| C++ | `tree-sitter-cpp` | JSX | `tree-sitter-javascript` |
-| CSS | `tree-sitter-css` | Python | `tree-sitter-python` |
-| Go | `tree-sitter-go` | Ruby | `tree-sitter-ruby` |
-| HTML | `tree-sitter-html` | Rust | `tree-sitter-rust` |
-| TypeScript | `tree-sitter-typescript` | TSX | `tree-sitter-tsx` |
+| Language | Grammar | Language | Grammar | Language | Grammar |
+| --- | --- | --- | --- | --- | --- |
+| Bash | `tree-sitter-bash` | C | `tree-sitter-c` | C++ | `tree-sitter-cpp` |
+| CSS | `tree-sitter-css` | Go | `tree-sitter-go` | HTML | `tree-sitter-html` |
+| Java | `tree-sitter-java` | JavaScript | `tree-sitter-javascript` | JSX | `tree-sitter-javascript` |
+| Python | `tree-sitter-python` | Ruby | `tree-sitter-ruby` | Rust | `tree-sitter-rust` |
+| Scala | `tree-sitter-scala` | TypeScript | `tree-sitter-typescript` | TSX | `tree-sitter-tsx` |
 
 Import parsing and keyword sets are implemented for JS/TS, Python, Rust, Go, Java, and C/C++. Files in other languages still get completions, just without the language-specific AST and import assistance.
 
@@ -256,7 +254,7 @@ src/
 ├── cache/
 │   ├── bounded-cache.ts                    # LRU + TTL cache with group invalidation
 │   └── completion-cache.ts                 # Completion cache keyed on content + edit hash
-├── constants/                              # Language map, import patterns, prompts, defaults
+├── constants/                              # Language map, grammar paths, import patterns, prompts, defaults
 ├── types/                                  # Shared interfaces and type definitions
 └── utils/                                  # Language/import/AST helpers, hashing, decorations
 ```

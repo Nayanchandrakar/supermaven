@@ -11,7 +11,11 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 
-const RUNTIME_WASM_FILE = "web-tree-sitter.wasm";
+import {
+  GRAMMARS_DIR_NAME,
+  RUNTIME_WASM_FILE,
+} from "../src/constants/grammars";
+
 const GRAMMAR_PACKAGE_PREFIX = "tree-sitter-";
 
 const { dirname, join } = path;
@@ -27,12 +31,12 @@ interface SetupContext {
   runtimeSource: string;
 }
 
-const createContext = (): SetupContext => {
+export const createContext = (): SetupContext => {
   const rootDir = dirname(import.meta.dirname);
   const nodeModulesDir = join(rootDir, "node_modules");
 
   return {
-    grammarsDir: join(rootDir, "grammars"),
+    grammarsDir: join(rootDir, GRAMMARS_DIR_NAME),
     nodeModulesDir,
     runtimeSource: join(nodeModulesDir, "web-tree-sitter", RUNTIME_WASM_FILE),
   };
@@ -115,4 +119,6 @@ export const setupGrammars = (
   console.log("Done. Grammar files are ready in the 'grammars/' folder.");
 };
 
-setupGrammars();
+if (import.meta.main) {
+  setupGrammars();
+}

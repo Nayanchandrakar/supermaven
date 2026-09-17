@@ -2,6 +2,7 @@ import path from "node:path";
 
 import * as TreeSitter from "web-tree-sitter";
 
+import { GRAMMARS_DIR_NAME, RUNTIME_WASM_FILE } from "@/constants/grammars";
 import { LANGUAGE_MAP } from "@/constants/language-map";
 
 type LanguageKey = keyof typeof LANGUAGE_MAP;
@@ -16,7 +17,7 @@ export class AstService {
   private isInitialized = false;
 
   constructor(extPath: string) {
-    this.grammarsDir = path.join(extPath, "grammers");
+    this.grammarsDir = path.join(extPath, GRAMMARS_DIR_NAME);
   }
 
   get isReady(): boolean {
@@ -25,7 +26,7 @@ export class AstService {
 
   async initialize() {
     try {
-      const wasmPath = path.join(this.grammarsDir, "web-tree-sitter.wasm");
+      const wasmPath = path.join(this.grammarsDir, RUNTIME_WASM_FILE);
 
       await TreeSitter.Parser.init({
         locateFile: () => wasmPath,
@@ -33,8 +34,12 @@ export class AstService {
 
       this.parser = new TreeSitter.Parser();
       this.isInitialized = true;
-    } catch {
+    } catch (error) {
       this.isInitialized = false;
+      throw new Error(
+        `Failed to initialize tree-sitter from "${this.grammarsDir}". Run 'bun scripts/setup-grammars.ts' to generate the grammar files.`,
+        { cause: error }
+      );
     }
   }
 
