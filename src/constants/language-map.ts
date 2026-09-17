@@ -11,6 +11,7 @@ export const LANGUAGE_MAP = {
   python: "tree-sitter-python.wasm",
   ruby: "tree-sitter-ruby.wasm",
   rust: "tree-sitter-rust.wasm",
+  scala: "tree-sitter-scala.wasm",
   typescript: "tree-sitter-typescript.wasm",
   typescriptreact: "tree-sitter-tsx.wasm",
 } as const satisfies Record<string, string>;
