@@ -6,7 +6,7 @@ export const DEFAULT_INFERENCE: CompletionConfig = {
   fireworksApiKey: "",
   groqApiKey: "",
   lspCacheMaxEntries: 100,
-  maxTokens: 1000,
-  model: "stealth/ox-alpha",
+  maxTokens: 500,
+  model: "qwen/qwen3.8-27b",
   openrouterApiKey: "",
 };
